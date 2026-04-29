@@ -79,6 +79,10 @@ const initialComposition = generateComposition({
   prompt: "neon night drive",
 });
 
+const maxImageDataUrlLength = 1_600_000;
+const imageCompressionDimensions = [1280, 960, 720];
+const imageCompressionQualities = [0.82, 0.72, 0.62, 0.52];
+
 const defaultWidgetTracks: WidgetTrack[] = [
   { id: "BASS", label: "$BASS", color: "#f5bd3d" },
   { id: "DRUMS", label: "$DRUMS", color: "#17b6a4" },
@@ -876,7 +880,10 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, bpm, style, imageName, imageDataUrl }),
       });
-      const result = (await response.json()) as Partial<GeneratedAIComposition> & {
+      const contentType = response.headers.get("content-type") ?? "";
+      const result = (contentType.includes("application/json")
+        ? await response.json()
+        : { error: (await response.text()) || `Request failed with ${response.status}` }) as Partial<GeneratedAIComposition> & {
         error?: string;
         fallback?: GeneratedComposition;
       };
@@ -886,7 +893,7 @@ export default function Home() {
           setComposition(result.fallback);
           setHasGeneratedPatch(true);
         }
-        setStatus(result.error ?? "OpenAI generation failed");
+        setStatus(response.status === 413 ? "Image is too large for generation" : (result.error ?? "OpenAI generation failed"));
         return;
       }
 
@@ -1009,14 +1016,82 @@ export default function Home() {
     });
   }
 
+  function loadImage(dataUrl: string) {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Could not read image file"));
+      image.src = dataUrl;
+    });
+  }
+
+  function canvasToDataUrl(canvas: HTMLCanvasElement, quality: number) {
+    return new Promise<string>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Could not compress image"));
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result ?? ""));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        },
+        "image/jpeg",
+        quality,
+      );
+    });
+  }
+
+  async function compressImageForGeneration(file: File) {
+    const sourceDataUrl = await readFileAsDataUrl(file);
+    const sourceImage = await loadImage(sourceDataUrl);
+    const sourceWidth = sourceImage.naturalWidth || sourceImage.width;
+    const sourceHeight = sourceImage.naturalHeight || sourceImage.height;
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Image compression is not available");
+    }
+
+    let compressed = "";
+    for (const dimension of imageCompressionDimensions) {
+      const scale = Math.min(1, dimension / Math.max(sourceWidth, sourceHeight));
+      const width = Math.max(1, Math.round(sourceWidth * scale));
+      const height = Math.max(1, Math.round(sourceHeight * scale));
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(sourceImage, 0, 0, width, height);
+
+      for (const quality of imageCompressionQualities) {
+        compressed = await canvasToDataUrl(canvas, quality);
+        if (compressed.length <= maxImageDataUrlLength) return compressed;
+      }
+    }
+
+    return compressed;
+  }
+
   async function onImageChange(file?: File) {
     if (!file) return;
-    setImageName(file.name);
-    const dataUrl = await readFileAsDataUrl(file);
-    setImageDataUrl(dataUrl);
-    setImagePreview(dataUrl);
-    setPrompt((current) => `${current}, image mood: ${file.name.replace(/\.[^.]+$/, "")}`);
-    setStatus("Image attached");
+
+    try {
+      setStatus("Preparing image");
+      setImageName(file.name);
+      const dataUrl = await compressImageForGeneration(file);
+      setImageDataUrl(dataUrl);
+      setImagePreview(dataUrl);
+      setPrompt((current) => `${current}, image mood: ${file.name.replace(/\.[^.]+$/, "")}`);
+      setStatus("Image attached");
+    } catch (error) {
+      console.error(error);
+      setImageDataUrl("");
+      setImagePreview("");
+      setStatus("Could not prepare image");
+    }
   }
 
   function openImagePicker() {

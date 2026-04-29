@@ -23,6 +23,7 @@ type StrudelAIResponse = {
 };
 
 const allowedStyles: StyleKey[] = ["dream", "club", "cinematic", "glitch", "ambient"];
+const maxRequestBodyBytes = 2_500_000;
 
 function extractTracks(code: string): Track[] {
   const colors = ["#f5bd3d", "#17b6a4", "#ef5c5c", "#7c8cff", "#8ff7ff", "#cfffff"];
@@ -39,7 +40,18 @@ function extractTracks(code: string): Track[] {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as GenerateRequest;
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > maxRequestBodyBytes) {
+    return NextResponse.json({ error: "Uploaded image is too large. Use a smaller image." }, { status: 413 });
+  }
+
+  let body: GenerateRequest;
+  try {
+    body = (await request.json()) as GenerateRequest;
+  } catch {
+    return NextResponse.json({ error: "Invalid generation request" }, { status: 400 });
+  }
+
   const prompt = body.prompt?.trim() || "image-inspired live-coded electronic loop";
   const bpm = Number.isFinite(body.bpm) ? Number(body.bpm) : 124;
   const style = body.style ?? "dream";
