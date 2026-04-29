@@ -335,7 +335,7 @@ function AudioVisualizer({ isPlaying, signalRef }: { isPlaying: boolean; signalR
 
         float scratches = smoothstep(0.986, 1.0, noise(vec2(uv.x * 38.0 + t * 0.17, uv.y * 4.0)));
         scratches += smoothstep(0.994, 1.0, noise(vec2(uv.x * 5.0 - t * 0.2, uv.y * 58.0)));
-        scratches *= 0.06 + energy * 0.12;
+        scratches *= energy * 0.14;
 
         float scanline = sin((gl_FragCoord.y + t * 26.0) * 1.1) * 0.5 + 0.5;
         float staticGrain = hash(gl_FragCoord.xy);
@@ -352,9 +352,10 @@ function AudioVisualizer({ isPlaying, signalRef }: { isPlaying: boolean; signalR
         luminance += sliceB * matter * (0.38 + u_drums * 0.58);
         luminance += scanBurst * matter * 0.22;
         luminance += verticalA * (0.24 + u_drums * 0.5) + verticalB * (0.18 + u_light * 0.36);
-        luminance += scratches + dust * 0.12;
+        float litMask = smoothstep(0.025, 0.22, matter + hot + filaments);
+        luminance += (scratches + dust * 0.12) * litMask;
         luminance *= 0.5 + energy * 0.86;
-        luminance += exp(-length(uv - pointer) * 8.0) * 0.08;
+        luminance += exp(-length(uv - pointer) * 8.0) * 0.08 * u_playing;
 
         float bloom = smoothstep(0.22, 1.45, luminance);
         float fringe = filaments * 0.22 + verticalA * 0.4 + hot * 0.18 + sliceA * matter * 0.18;
@@ -383,7 +384,8 @@ function AudioVisualizer({ isPlaying, signalRef }: { isPlaying: boolean; signalR
         float vignette = smoothstep(1.42, 0.18, length(uv));
         color *= vignette;
         color *= 0.94 + scanline * 0.06;
-        color += vec3((grain - 0.5) * 0.055 + grain * 0.018);
+        color += vec3((grain - 0.5) * 0.035) * smoothstep(0.04, 0.34, luminance);
+        color = max(color - vec3(0.018), vec3(0.0));
         color = pow(max(color, 0.0), vec3(0.82));
 
         gl_FragColor = vec4(color, 1.0);
@@ -539,7 +541,7 @@ function AudioVisualizer({ isPlaying, signalRef }: { isPlaying: boolean; signalR
       gl.uniform2f(uniforms.pointer, pointerRef.current.x, pointerRef.current.y);
       gl.uniform1f(uniforms.time, (performance.now() - startedAt) / 1000);
       gl.uniform1f(uniforms.playing, isPlaying ? 1 : 0);
-      gl.uniform1f(uniforms.master, Math.min(1, signal.master + (isPlaying ? 0.08 : 0.02)));
+      gl.uniform1f(uniforms.master, Math.min(1, signal.master + (isPlaying ? 0.08 : 0)));
       gl.uniform1f(uniforms.bass, signal.bass);
       gl.uniform1f(uniforms.drums, signal.drums);
       gl.uniform1f(uniforms.mel, signal.mel);
