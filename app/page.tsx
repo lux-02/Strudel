@@ -8,6 +8,7 @@ import {
   ImagePlus,
   LoaderCircle,
   Play,
+  Settings,
   Sparkles,
   Square,
 } from "lucide-react";
@@ -36,7 +37,11 @@ type GeneratedAIComposition = GeneratedComposition & {
   bpm?: number;
   style?: StyleKey;
   analysis?: string;
+  provider?: AIProvider;
+  providerFallback?: boolean;
 };
+
+type AIProvider = "gpt" | "kanana";
 
 type ActivePattern = {
   queryArc?: (begin: number, end: number, controls?: Record<string, unknown>) => ActiveHap[];
@@ -695,6 +700,9 @@ export default function Home() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [runtimeReady, setRuntimeReady] = useState(false);
   const [status, setStatus] = useState("Ready");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aiProvider, setAiProvider] = useState<AIProvider>("gpt");
+  const [kananaApiKey, setKananaApiKey] = useState("");
   const [activeCodeRanges, setActiveCodeRanges] = useState<CodeRange[]>([]);
   const [widgetVisibility, setWidgetVisibility] = useState<WidgetVisibility>({});
   const hasImageMood = imageDataUrl.trim().length > 0;
@@ -859,6 +867,30 @@ export default function Home() {
     codeLengthRef.current = composition.code.length;
   }, [composition.code]);
 
+  useEffect(() => {
+    const savedProvider = window.localStorage.getItem("strudel-ai-provider");
+    const savedKananaKey = window.localStorage.getItem("strudel-kanana-api-key");
+
+    if (savedProvider === "gpt" || savedProvider === "kanana") {
+      setAiProvider(savedProvider);
+    }
+    if (savedKananaKey) {
+      setKananaApiKey(savedKananaKey);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("strudel-ai-provider", aiProvider);
+  }, [aiProvider]);
+
+  useEffect(() => {
+    if (kananaApiKey.trim()) {
+      window.localStorage.setItem("strudel-kanana-api-key", kananaApiKey.trim());
+    } else {
+      window.localStorage.removeItem("strudel-kanana-api-key");
+    }
+  }, [kananaApiKey]);
+
   const generate = useCallback(async () => {
     if (!hasImageMood) {
       setStatus("Add an image mood first");
@@ -874,13 +906,21 @@ export default function Home() {
     setIsPlaying(false);
     setAutoPlayRequested(false);
     setIsGenerating(true);
-    setStatus("Generating Strudel code with OpenAI");
+    setStatus(aiProvider === "kanana" ? "Generating Strudel code with Kanana" : "Generating Strudel code with GPT");
 
     try {
       const response = await fetch("/api/generate-strudel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, bpm, style, imageName, imageDataUrl }),
+        body: JSON.stringify({
+          prompt,
+          bpm,
+          style,
+          imageName,
+          imageDataUrl,
+          aiProvider,
+          kananaApiKey: aiProvider === "kanana" ? kananaApiKey.trim() : "",
+        }),
       });
       const contentType = response.headers.get("content-type") ?? "";
       const result = (contentType.includes("application/json")
@@ -917,14 +957,16 @@ export default function Home() {
       if (result.style) {
         setStyle(result.style);
       }
-      setStatus(result.analysis ? `Image analysis: ${result.analysis}` : "Generated Strudel code with OpenAI");
+      const providerLabel = result.provider === "kanana" ? "Kanana" : "GPT";
+      const fallbackLabel = result.providerFallback ? " (GPT fallback)" : "";
+      setStatus(result.analysis ? `${providerLabel}${fallbackLabel}: ${result.analysis}` : `Generated Strudel code with ${providerLabel}${fallbackLabel}`);
     } catch (error) {
       console.error(error);
       setStatus("Could not reach OpenAI generator");
     } finally {
       setIsGenerating(false);
     }
-  }, [bpm, clearWidgetVisibilityMonitor, composition.tracks, hasImageMood, imageDataUrl, imageName, prompt, stopCodeHighlightLoop, style, widgetTracks]);
+  }, [aiProvider, bpm, clearWidgetVisibilityMonitor, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, prompt, stopCodeHighlightLoop, style, widgetTracks]);
 
   const play = useCallback(async () => {
     if (!patchReady) {
@@ -1136,6 +1178,10 @@ export default function Home() {
               <Download size={17} />
               Code
             </button>
+            <button onClick={() => setSettingsOpen(true)}>
+              <Settings size={17} />
+              Settings
+            </button>
           </div>
 
           <div className="transport-row">
@@ -1152,6 +1198,52 @@ export default function Home() {
             Strudel © contributors · AGPL-3.0-or-later
           </p>
         </div>
+
+        {settingsOpen ? (
+          <div className="settings-backdrop" role="presentation" onClick={() => setSettingsOpen(false)}>
+            <section className="settings-panel" role="dialog" aria-modal="true" aria-label="AI model settings" onClick={(event) => event.stopPropagation()}>
+              <div className="settings-header">
+                <strong>AI Model</strong>
+                <button type="button" onClick={() => setSettingsOpen(false)}>Done</button>
+              </div>
+
+              <div className="provider-options" role="radiogroup" aria-label="AI model">
+                <label className={aiProvider === "gpt" ? "provider-option selected" : "provider-option"}>
+                  <input
+                    type="radio"
+                    name="ai-provider"
+                    value="gpt"
+                    checked={aiProvider === "gpt"}
+                    onChange={() => setAiProvider("gpt")}
+                  />
+                  <span>GPT</span>
+                </label>
+                <label className={aiProvider === "kanana" ? "provider-option selected" : "provider-option"}>
+                  <input
+                    type="radio"
+                    name="ai-provider"
+                    value="kanana"
+                    checked={aiProvider === "kanana"}
+                    onChange={() => setAiProvider("kanana")}
+                  />
+                  <span>Kanana</span>
+                </label>
+              </div>
+
+              <label className="settings-field">
+                <span>Kanana API Key</span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={kananaApiKey}
+                  onChange={(event) => setKananaApiKey(event.target.value)}
+                  placeholder="KC_..."
+                />
+              </label>
+              <p className="settings-help">Kanana fails over to GPT automatically when the request fails.</p>
+            </section>
+          </div>
+        ) : null}
 
         <div className="main-panel">
           <div className="visual-panel">

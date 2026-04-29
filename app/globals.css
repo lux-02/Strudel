@@ -226,6 +226,92 @@ select:focus {
   text-align: center;
 }
 
+.settings-backdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.68);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 20;
+}
+
+.settings-panel {
+  background: #050605;
+  border: 1px solid #242824;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.85rem;
+  max-width: 21rem;
+  padding: 1rem;
+  width: min(100%, 21rem);
+}
+
+.settings-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.settings-header strong {
+  font-size: 0.95rem;
+}
+
+.settings-header button {
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+}
+
+.provider-options {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.provider-option {
+  align-items: center;
+  background: #0b0d0b;
+  border: 1px solid #242824;
+  border-radius: 5px;
+  color: #aab2aa;
+  cursor: pointer;
+  display: flex;
+  gap: 0.45rem;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.provider-option.selected {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.provider-option input {
+  accent-color: var(--accent);
+  width: auto;
+}
+
+.settings-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.settings-field span,
+.settings-help {
+  color: #7e877e;
+  font-size: 0.72rem;
+}
+
+.settings-field input {
+  background: #000;
+  border-color: #242824;
+}
+
+.settings-help {
+  line-height: 1.35;
+}
+
 .status {
   background: #0b0d0b;
   border: 1px solid var(--line);
