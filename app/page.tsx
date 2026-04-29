@@ -1145,6 +1145,10 @@ export default function Home() {
               {isEvaluating ? "Starting" : isPlaying ? "Stop" : "Play"}
             </button>
           </div>
+
+          <p className="license-note">
+            Strudel © contributors · AGPL-3.0-or-later
+          </p>
         </div>
 
         <div className="main-panel">

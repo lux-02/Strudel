@@ -196,8 +196,13 @@ select:focus {
 
 .button-grid {
   display: grid;
-  gap: 0.4rem;
-  grid-template-columns: 1fr 1fr;
+  gap: 0.48rem;
+  grid-template-columns: 1fr;
+}
+
+.button-grid button,
+.transport-row button {
+  min-height: 2.9rem;
 }
 
 .button-grid .primary {
@@ -209,12 +214,16 @@ select:focus {
 
 .transport-row {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.48rem;
   grid-template-columns: 1fr;
 }
 
-.transport-row button {
-  min-height: 2.9rem;
+.license-note {
+  color: #687168;
+  font-size: 0.66rem;
+  line-height: 1.25;
+  margin: auto 0 0;
+  text-align: center;
 }
 
 .status {
