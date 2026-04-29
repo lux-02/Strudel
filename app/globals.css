@@ -100,6 +100,7 @@ h2 {
 }
 
 .control-panel,
+.visual-panel,
 .editor-panel,
 .stage-wrap {
   background: transparent;
@@ -180,7 +181,7 @@ select:focus {
 
 .drop-zone img {
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   width: 100%;
 }
 
@@ -230,9 +231,9 @@ select:focus {
   border: 0;
   border-radius: 0;
   display: grid;
-  flex: 1;
   grid-template-rows: minmax(0, 1fr);
-  min-height: 8rem;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   padding: 0;
 }
@@ -251,10 +252,20 @@ select:focus {
 .main-panel {
   display: grid;
   gap: 0.5rem;
-  grid-template-columns: minmax(22rem, 0.86fr) minmax(28rem, 1fr);
+  grid-template-columns: minmax(20rem, 0.78fr) minmax(30rem, 1fr);
   height: 100%;
   min-width: 0;
   min-height: 0;
+}
+
+.visual-panel {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-rows: minmax(0, 0.58fr) minmax(0, 0.42fr);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .stage-wrap {
@@ -480,7 +491,7 @@ select:focus {
   }
 
   .main-panel {
-    grid-template-columns: minmax(20rem, 0.86fr) minmax(24rem, 1fr);
+    grid-template-columns: minmax(18rem, 0.78fr) minmax(24rem, 1fr);
   }
 }
 
@@ -512,6 +523,10 @@ select:focus {
   .workspace,
   .main-panel {
     grid-template-columns: 1fr;
+  }
+
+  .visual-panel {
+    grid-template-rows: minmax(28rem, auto) minmax(14rem, auto);
   }
 
   .workspace {

@@ -1145,57 +1145,59 @@ export default function Home() {
               {isEvaluating ? "Starting" : isPlaying ? "Stop" : "Play"}
             </button>
           </div>
-
-          <AudioVisualizer isPlaying={isPlaying} signalRef={visualSignalRef} />
         </div>
 
         <div className="main-panel">
-          <section className="stage-wrap" aria-label="Vertical short-form stage">
-            <div className={isPlaying ? "phone-stage playing" : "phone-stage"}>
-              <pre>{renderHighlightedCode(composition.code, activeCodeRanges)}</pre>
-              <div className="phone-widgets" aria-label="Live track widgets">
-                {widgetTracks.map((track) => {
-                  const visibility = widgetVisibility[track.id];
-                  const hasMeasured = Boolean(visibility);
-                  const showPianoroll = !isPlaying || !hasMeasured || visibility?.pianoroll === true;
-                  const showScope = !isPlaying || !hasMeasured || visibility?.scope === true;
-                  const canvasClassName =
-                    showPianoroll && !showScope ? "phone-canvases only-pianoroll" : !showPianoroll && showScope ? "phone-canvases only-scope" : "phone-canvases";
-                  const widgetClassName = [
-                    "phone-widget",
-                    activeTrackIDs.has(track.id.toUpperCase()) ? "active" : "",
-                    isPlaying && hasMeasured && !showPianoroll && !showScope ? "hidden" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
+          <div className="visual-panel">
+            <section className="stage-wrap" aria-label="Vertical short-form stage">
+              <div className={isPlaying ? "phone-stage playing" : "phone-stage"}>
+                <pre>{renderHighlightedCode(composition.code, activeCodeRanges)}</pre>
+                <div className="phone-widgets" aria-label="Live track widgets">
+                  {widgetTracks.map((track) => {
+                    const visibility = widgetVisibility[track.id];
+                    const hasMeasured = Boolean(visibility);
+                    const showPianoroll = !isPlaying || !hasMeasured || visibility?.pianoroll === true;
+                    const showScope = !isPlaying || !hasMeasured || visibility?.scope === true;
+                    const canvasClassName =
+                      showPianoroll && !showScope ? "phone-canvases only-pianoroll" : !showPianoroll && showScope ? "phone-canvases only-scope" : "phone-canvases";
+                    const widgetClassName = [
+                      "phone-widget",
+                      activeTrackIDs.has(track.id.toUpperCase()) ? "active" : "",
+                      isPlaying && hasMeasured && !showPianoroll && !showScope ? "hidden" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
 
-                  return (
-                    <article className={widgetClassName} key={track.id} style={{ "--track-color": track.color } as React.CSSProperties}>
-                      <header>
-                        <strong>{track.label}</strong>
-                      </header>
-                      <div className={canvasClassName}>
-                        <div className={showPianoroll ? "phone-canvas-slot" : "phone-canvas-slot hidden"}>
-                          <span>Piano</span>
-                          <canvas
-                            ref={(node) => setWidgetCanvasRef(track.id, "pianoroll", node)}
-                            aria-label={`${track.label} pianoroll`}
-                          />
+                    return (
+                      <article className={widgetClassName} key={track.id} style={{ "--track-color": track.color } as React.CSSProperties}>
+                        <header>
+                          <strong>{track.label}</strong>
+                        </header>
+                        <div className={canvasClassName}>
+                          <div className={showPianoroll ? "phone-canvas-slot" : "phone-canvas-slot hidden"}>
+                            <span>Piano</span>
+                            <canvas
+                              ref={(node) => setWidgetCanvasRef(track.id, "pianoroll", node)}
+                              aria-label={`${track.label} pianoroll`}
+                            />
+                          </div>
+                          <div className={showScope ? "phone-canvas-slot" : "phone-canvas-slot hidden"}>
+                            <span>Wave</span>
+                            <canvas
+                              ref={(node) => setWidgetCanvasRef(track.id, "scope", node)}
+                              aria-label={`${track.label} waveform`}
+                            />
+                          </div>
                         </div>
-                        <div className={showScope ? "phone-canvas-slot" : "phone-canvas-slot hidden"}>
-                          <span>Wave</span>
-                          <canvas
-                            ref={(node) => setWidgetCanvasRef(track.id, "scope", node)}
-                            aria-label={`${track.label} waveform`}
-                          />
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                      </article>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+
+            <AudioVisualizer isPlaying={isPlaying} signalRef={visualSignalRef} />
+          </div>
 
           <section className="editor-panel" aria-label="Strudel code editor">
             <CodeMirror
