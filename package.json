@@ -1,0 +1,33 @@
+{
+  "name": "strudel-ai-visual-coder",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@codemirror/lang-javascript": "latest",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "latest",
+    "@strudel/draw": "latest",
+    "@strudel/web": "latest",
+    "@uiw/react-codemirror": "latest",
+    "lucide-react": "latest",
+    "next": "latest",
+    "openai": "^6.35.0",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}
