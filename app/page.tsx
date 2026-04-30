@@ -1798,6 +1798,18 @@ export default function Home() {
 
   return (
     <main className="shell" onPointerDownCapture={primeAudioFromUserGesture}>
+      <section className="mobile-gate" aria-label="Desktop required">
+        <div className="mobile-gate-content">
+          <strong>PC에서 접속해 주세요</strong>
+          <p>
+            Strudel AI Visual Coder는 키보드, 오디오, WebGL을 사용하는 데스크톱 브라우저에 최적화되어 있습니다.
+          </p>
+          <span>아래 주소를 PC 브라우저에서 열어주세요.</span>
+          <a href="https://strudel.n2f.site">strudel.n2f.site</a>
+          <small>Strudel © contributors · AGPL-3.0-or-later</small>
+        </div>
+      </section>
+
       <section className="workspace" aria-label="Strudel visual coding workspace">
         <div className="control-panel">
           <button
