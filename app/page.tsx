@@ -908,6 +908,7 @@ export default function Home() {
   const variantSwitchTimerRef = useRef<number | null>(null);
   const shaderTransitionFrameRef = useRef<number | null>(null);
   const transitionRequestRef = useRef(0);
+  const audioUnlockPromiseRef = useRef<Promise<void> | null>(null);
   const visualSignalRef = useRef<VisualSignal>({
     master: 0.16,
     bass: 0,
@@ -1117,6 +1118,44 @@ export default function Home() {
       setSettingsOpen(false);
     }
   }, [isPlaying, settingsOpen]);
+
+  const unlockAudioEngine = useCallback(async () => {
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+
+    if (audioUnlockPromiseRef.current) {
+      await audioUnlockPromiseRef.current;
+      return;
+    }
+
+    const unlock = (async () => {
+      const resumeCurrentContext = async () => {
+        const audioContext = runtime.getAudioContext?.();
+        if (audioContext?.state === "suspended") {
+          await audioContext.resume();
+        }
+      };
+
+      await resumeCurrentContext();
+      try {
+        await runtime.initAudio?.();
+      } catch (error) {
+        console.debug("Audio init skipped", error);
+      }
+      await resumeCurrentContext();
+    })();
+
+    audioUnlockPromiseRef.current = unlock.finally(() => {
+      audioUnlockPromiseRef.current = null;
+    });
+    await audioUnlockPromiseRef.current;
+  }, []);
+
+  const primeAudioFromUserGesture = useCallback(() => {
+    void unlockAudioEngine().catch((error) => {
+      console.debug("Audio unlock from user gesture skipped", error);
+    });
+  }, [unlockAudioEngine]);
 
   const resetPlaybackForPatchChange = useCallback(() => {
     clearQueuedVariantSwitch();
@@ -1394,15 +1433,9 @@ export default function Home() {
       }])
       : undefined;
 
-    try {
-      await runtimeRef.current?.initAudio?.();
-      const audioContext = runtimeRef.current?.getAudioContext?.();
-      if (audioContext?.state === "suspended") {
-        await audioContext.resume();
-      }
-    } catch (error) {
+    await unlockAudioEngine().catch((error) => {
       console.debug("Audio unlock before generation skipped", error);
-    }
+    });
 
     resetPlaybackForPatchChange();
     setIsGenerating(true);
@@ -1487,7 +1520,7 @@ export default function Home() {
     } finally {
       setIsGenerating(false);
     }
-  }, [aiProvider, applyVariant, bpm, composition.code, composition.title, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, patchReady, prompt, resetPlaybackForPatchChange, shaderStyle, style, variants]);
+  }, [aiProvider, applyVariant, bpm, composition.code, composition.title, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, patchReady, prompt, resetPlaybackForPatchChange, shaderStyle, style, unlockAudioEngine, variants]);
 
   const generate = useCallback(async () => {
     await requestVariants("generate");
@@ -1510,11 +1543,7 @@ export default function Home() {
     try {
       setIsEvaluating(true);
       setStatus("Starting audio engine");
-      await runtimeRef.current.initAudio?.();
-      const audioContext = runtimeRef.current.getAudioContext?.();
-      if (audioContext?.state === "suspended") {
-        await audioContext.resume();
-      }
+      await unlockAudioEngine();
       setStatus("Evaluating Strudel code");
       runtimeRef.current.hush();
       stopStrudelWidgetAnimations(widgetTracks.map((track) => track.id));
@@ -1542,7 +1571,7 @@ export default function Home() {
     } finally {
       setIsEvaluating(false);
     }
-  }, [composition.code, patchReady, startCodeHighlightLoop, startWidgetVisibilityMonitor, stopCodeHighlightLoop, widgetTracks]);
+  }, [composition.code, patchReady, startCodeHighlightLoop, startWidgetVisibilityMonitor, stopCodeHighlightLoop, unlockAudioEngine, widgetTracks]);
 
   useEffect(() => {
     if (!isPlaying || !patchReady || !runtimeReady || isEvaluating) return;
@@ -1768,7 +1797,7 @@ export default function Home() {
   }
 
   return (
-    <main className="shell">
+    <main className="shell" onPointerDownCapture={primeAudioFromUserGesture}>
       <section className="workspace" aria-label="Strudel visual coding workspace">
         <div className="control-panel">
           <button
