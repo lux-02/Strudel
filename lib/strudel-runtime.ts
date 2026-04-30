@@ -19,7 +19,7 @@ export type StrudelRuntime = {
   evaluate: (code: string, autoplay?: boolean) => Promise<unknown>;
   hush: () => void;
   registerWidgetType?: (type: string) => void;
-  samples?: (sampleMap: string, baseUrl?: string, options?: unknown) => Promise<unknown>;
+  samples?: (sampleMap: string | Record<string, string | string[]>, baseUrl?: string, options?: unknown) => Promise<unknown>;
 };
 
 export type WidgetTrack = {

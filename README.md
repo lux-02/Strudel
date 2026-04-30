@@ -31,7 +31,8 @@ Strudel AI Visual Coder는 이미지를 분석해 Strudel 음악 코드와 오�
 - **Variant + Evolve**: A/B/C/D 변주를 생성하고, 현재 변주들을 바탕으로 이어지는 새 변주를 만듭니다.
 - **DJ식 큐 전환**: 재생 중 변주를 선택하면 다음 마디 기준으로 큐하고, AI bridge를 통해 긴 크로스페이드를 시도합니다.
 - **AI Visual Style Generator**: 이미지 분석 결과로 `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, `scanline` 값을 생성합니다.
-- **GPT / Kanana 선택**: 기본은 OpenAI GPT이며, Settings에서 Kanana-compatible endpoint를 선택할 수 있습니다.
+- **Semantic Vocal Chop**: 이미지에서 추출한 단어와 형태소를 AI 음성으로 합성하고, `$VOICE` 트랙에서 보컬 찹처럼 잘라 사용합니다.
+- **GPT / Kanana 선택**: 기본은 OpenAI GPT이며, Settings에서 Kanana-compatible endpoint를 선택할 수 있습니다. Kanana 선택 시 보이스 텍스처도 Kanana 오디오 응답을 우선 사용합니다.
 - **HEIC/HEIF 지원**: iPhone 이미지는 브라우저에서 JPEG로 변환한 뒤 분석합니다.
 
 ### 사용 방법
@@ -68,11 +69,15 @@ cp .env.example .env.local
 ```env
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
+OPENAI_TTS_MODEL=gpt-4o-mini-tts
+OPENAI_TTS_VOICE=ash
 KANANA_API_KEY=
 ```
 
 - `OPENAI_API_KEY`: GPT 기반 이미지 분석과 Strudel 생성에 필요합니다.
 - `OPENAI_MODEL`: 사용할 OpenAI 모델명입니다. 기본값은 `gpt-5.5`입니다.
+- `OPENAI_TTS_MODEL`: Semantic Vocal Chop 생성에 사용할 TTS 모델입니다. 기본값은 `gpt-4o-mini-tts`입니다.
+- `OPENAI_TTS_VOICE`: Semantic Vocal Chop 생성에 사용할 음성입니다. 기본값은 `ash`입니다.
 - `KANANA_API_KEY`: Kanana provider를 사용할 때의 서버 기본 키입니다. 사용자가 Settings에서 직접 입력할 수도 있습니다.
 
 실제 API Key는 `.env.local`에만 보관하세요. `.env*` 파일은 Git에서 무시됩니다.
@@ -138,7 +143,9 @@ npm run build
 - 업로드 이미지는 API 요청 크기 제한을 피하기 위해 클라이언트에서 압축됩니다.
 - 모바일 브라우저에서는 오디오 정책, WebGL 성능, 코드 편집 UX가 불안정할 수 있어 데스크톱 전용 안내 화면을 표시합니다.
 - AI가 생성한 Strudel 코드에 브라우저 런타임과 맞지 않는 표현이 들어올 수 있어 `normalizeStrudelCode`에서 일부 표현을 보정합니다.
+- 서버는 생성된 Strudel 코드를 브라우저에 보내기 전에 문법 검사를 수행하며, Kanana 결과가 유효하지 않으면 GPT fallback 경로를 사용합니다.
 - 브라우저 자동재생 정책 때문에 `Generate` 또는 `Play` 시점에 오디오 컨텍스트를 먼저 깨웁니다.
+- `$VOICE` 트랙에 쓰이는 음성은 AI로 생성된 보이스 텍스처이며, 사람의 실제 녹음이 아닙니다.
 
 ### 라이선스 및 Attribution
 
@@ -171,7 +178,8 @@ The interface is built for visual music capture: generated code, piano rolls, wa
 - **Variant Generation + Evolve**: Generates A/B/C/D variants and evolves them into new compatible variations.
 - **Quantized DJ-style switching**: Queues variant changes on musical boundaries and uses AI bridge patches for longer transitions.
 - **AI Visual Style Generator**: Produces shader parameters such as `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, and `scanline`.
-- **GPT / Kanana provider selection**: Defaults to OpenAI GPT and optionally supports a Kanana-compatible endpoint.
+- **Semantic Vocal Chop**: Turns image-derived words and morphemes into an AI-generated voice texture for the `$VOICE` track.
+- **GPT / Kanana provider selection**: Defaults to OpenAI GPT and optionally supports a Kanana-compatible endpoint. When Kanana is selected, voice texture synthesis uses Kanana audio first.
 - **HEIC/HEIF support**: Converts iPhone images to JPEG in the browser before analysis.
 
 ### Quick Start
@@ -198,6 +206,8 @@ cp .env.example .env.local
 ```env
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
+OPENAI_TTS_MODEL=gpt-4o-mini-tts
+OPENAI_TTS_VOICE=ash
 KANANA_API_KEY=
 ```
 
@@ -233,7 +243,9 @@ npm run build
 - Desktop browser required. Mobile visitors are shown a desktop-only notice.
 - Uploaded images are compressed client-side to avoid request size limits.
 - AI-generated Strudel may include unstable expressions, so `normalizeStrudelCode` applies compatibility fixes before playback.
+- Generated Strudel is syntax-checked on the server before reaching the browser; invalid Kanana output can fall back to GPT generation.
 - Browser autoplay rules can affect audio startup; the app tries to unlock the audio context during `Generate` or `Play`.
+- The `$VOICE` track uses an AI-generated voice texture, not a human recording.
 
 ### License and Attribution
 

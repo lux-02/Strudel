@@ -12,3 +12,7 @@ declare module "@strudel/web" {
 }
 
 declare module "@strudel/draw";
+
+declare module "@strudel/transpiler" {
+  export function transpiler(input: string, options?: Record<string, unknown>): unknown;
+}

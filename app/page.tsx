@@ -41,6 +41,7 @@ type GeneratedAIComposition = GeneratedComposition & {
   provider?: AIProvider;
   providerFallback?: boolean;
   variants?: GeneratedAIVariant[];
+  voiceTexture?: VoiceTexture;
 };
 
 type AIProvider = "gpt" | "kanana";
@@ -76,6 +77,16 @@ type ActiveLocation =
 
 type WidgetType = "pianoroll" | "scope";
 type WidgetVisibility = Partial<Record<string, Partial<Record<WidgetType, boolean>>>>;
+type VoiceTexture = {
+  enabled?: boolean;
+  text?: string;
+  words?: string[];
+  language?: "ko" | "en" | "hybrid" | "abstract";
+  chopPattern?: string;
+  audioDataUrl?: string;
+  mimeType?: string;
+  disclosure?: string;
+};
 type VisualSignal = {
   master: number;
   bass: number;
@@ -223,6 +234,9 @@ function updateVisualSignal(signalRef: VisualSignalRef, code: string, ranges: Co
       next.mel = Math.min(1, next.mel + 0.3);
     } else if (trackID.includes("SYNTH") || trackID.includes("PAD")) {
       next.synth = Math.min(1, next.synth + 0.28);
+    } else if (trackID.includes("VOICE")) {
+      next.texture = Math.min(1, next.texture + 0.3);
+      next.light = Math.min(1, next.light + 0.18);
     } else if (trackID.includes("TEXTURE")) {
       next.texture = Math.min(1, next.texture + 0.34);
     } else if (trackID.includes("LIGHT")) {
@@ -259,6 +273,21 @@ function normalizeVariant(variant: Partial<GeneratedAIVariant>, index: number, f
     style: variant.style,
     analysis: variant.analysis,
     shaderStyle: normalizeShaderStyle(variant.shaderStyle),
+  };
+}
+
+function normalizeVoiceTexture(voiceTexture?: VoiceTexture): VoiceTexture | null {
+  if (!voiceTexture?.enabled || !voiceTexture.audioDataUrl?.startsWith("data:audio/")) return null;
+
+  return {
+    enabled: true,
+    text: voiceTexture.text,
+    words: voiceTexture.words?.filter(Boolean).slice(0, 9),
+    language: voiceTexture.language,
+    chopPattern: voiceTexture.chopPattern,
+    audioDataUrl: voiceTexture.audioDataUrl,
+    mimeType: voiceTexture.mimeType,
+    disclosure: voiceTexture.disclosure,
   };
 }
 
@@ -909,6 +938,8 @@ export default function Home() {
   const shaderTransitionFrameRef = useRef<number | null>(null);
   const transitionRequestRef = useRef(0);
   const audioUnlockPromiseRef = useRef<Promise<void> | null>(null);
+  const voiceTextureRef = useRef<VoiceTexture | null>(null);
+  const registeredVoiceSampleRef = useRef("");
   const visualSignalRef = useRef<VisualSignal>({
     master: 0.16,
     bass: 0,
@@ -1157,6 +1188,17 @@ export default function Home() {
     });
   }, [unlockAudioEngine]);
 
+  const registerVoiceTexture = useCallback(async (voiceTexture: VoiceTexture | null = voiceTextureRef.current) => {
+    const audioDataUrl = voiceTexture?.audioDataUrl;
+    if (!voiceTexture?.enabled || !audioDataUrl?.startsWith("data:audio/") || !runtimeRef.current?.samples) {
+      return;
+    }
+    if (registeredVoiceSampleRef.current === audioDataUrl) return;
+
+    await runtimeRef.current.samples({ voice: [audioDataUrl] }, "", { tag: "semantic-voice-texture" });
+    registeredVoiceSampleRef.current = audioDataUrl;
+  }, []);
+
   const resetPlaybackForPatchChange = useCallback(() => {
     clearQueuedVariantSwitch();
     clearLiveEvalTimer();
@@ -1224,6 +1266,7 @@ export default function Home() {
       clearWidgetVisibilityMonitor();
       setWidgetVisibility({});
       stopCodeHighlightLoop();
+      await registerVoiceTexture();
 
       const pattern = await runtimeRef.current.evaluate(playableCode);
       if (!pattern) {
@@ -1251,6 +1294,7 @@ export default function Home() {
     applyVariant,
     clearLiveEvalTimer,
     clearWidgetVisibilityMonitor,
+    registerVoiceTexture,
     startCodeHighlightLoop,
     startWidgetVisibilityMonitor,
     stopCodeHighlightLoop,
@@ -1470,6 +1514,14 @@ export default function Home() {
       const normalizedVariants = (result.variants ?? [])
         .map((variant, index) => normalizeVariant(variant, index, composition.tracks))
         .filter(Boolean) as GeneratedAIVariant[];
+      const voiceTexture = normalizeVoiceTexture(result.voiceTexture);
+      voiceTextureRef.current = voiceTexture;
+      registeredVoiceSampleRef.current = "";
+      if (voiceTexture) {
+        await registerVoiceTexture(voiceTexture).catch((error) => {
+          console.debug("Voice texture sample registration skipped", error);
+        });
+      }
 
       if (!response.ok) {
         if (normalizedVariants.length) {
@@ -1520,7 +1572,7 @@ export default function Home() {
     } finally {
       setIsGenerating(false);
     }
-  }, [aiProvider, applyVariant, bpm, composition.code, composition.title, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, patchReady, prompt, resetPlaybackForPatchChange, shaderStyle, style, unlockAudioEngine, variants]);
+  }, [aiProvider, applyVariant, bpm, composition.code, composition.title, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, patchReady, prompt, registerVoiceTexture, resetPlaybackForPatchChange, shaderStyle, style, unlockAudioEngine, variants]);
 
   const generate = useCallback(async () => {
     await requestVariants("generate");
@@ -1552,6 +1604,7 @@ export default function Home() {
       if (playableCode !== composition.code) {
         setComposition((current) => ({ ...current, code: playableCode }));
       }
+      await registerVoiceTexture();
       const pattern = await runtimeRef.current.evaluate(playableCode);
       if (!pattern) {
         setIsPlaying(false);
@@ -1571,7 +1624,7 @@ export default function Home() {
     } finally {
       setIsEvaluating(false);
     }
-  }, [composition.code, patchReady, startCodeHighlightLoop, startWidgetVisibilityMonitor, stopCodeHighlightLoop, unlockAudioEngine, widgetTracks]);
+  }, [composition.code, patchReady, registerVoiceTexture, startCodeHighlightLoop, startWidgetVisibilityMonitor, stopCodeHighlightLoop, unlockAudioEngine, widgetTracks]);
 
   useEffect(() => {
     if (!isPlaying || !patchReady || !runtimeReady || isEvaluating) return;
@@ -1594,6 +1647,7 @@ export default function Home() {
         clearWidgetVisibilityMonitor();
         setWidgetVisibility({});
         stopCodeHighlightLoop();
+        await registerVoiceTexture();
 
         const pattern = await runtimeRef.current.evaluate(playableCode);
         if (liveEvalSeqRef.current !== requestId) return;
@@ -1634,6 +1688,7 @@ export default function Home() {
     isEvaluating,
     isPlaying,
     patchReady,
+    registerVoiceTexture,
     runtimeReady,
     startCodeHighlightLoop,
     startWidgetVisibilityMonitor,
