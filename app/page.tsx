@@ -1174,13 +1174,13 @@ export default function Home() {
               {isGenerating ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
               {isGenerating ? "Generating" : "Generate"}
             </button>
-            <button onClick={exportCode} disabled={!patchReady}>
-              <Download size={17} />
-              Code
-            </button>
             <button onClick={() => setSettingsOpen(true)}>
               <Settings size={17} />
               Settings
+            </button>
+            <button onClick={exportCode} disabled={!patchReady}>
+              <Download size={17} />
+              Code
             </button>
           </div>
 
@@ -1230,73 +1230,23 @@ export default function Home() {
                 </label>
               </div>
 
-              <label className="settings-field">
-                <span>Kanana API Key</span>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  value={kananaApiKey}
-                  onChange={(event) => setKananaApiKey(event.target.value)}
-                  placeholder="KC_..."
-                />
-              </label>
-              <p className="settings-help">Kanana fails over to GPT automatically when the request fails.</p>
+              {aiProvider === "kanana" ? (
+                <label className="settings-field">
+                  <span>Kanana API Key</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={kananaApiKey}
+                    onChange={(event) => setKananaApiKey(event.target.value)}
+                    placeholder="KC_..."
+                  />
+                </label>
+              ) : null}
             </section>
           </div>
         ) : null}
 
         <div className="main-panel">
-          <div className="visual-panel">
-            <section className="stage-wrap" aria-label="Vertical short-form stage">
-              <div className={isPlaying ? "phone-stage playing" : "phone-stage"}>
-                <pre>{renderHighlightedCode(composition.code, activeCodeRanges)}</pre>
-                <div className="phone-widgets" aria-label="Live track widgets">
-                  {widgetTracks.map((track) => {
-                    const visibility = widgetVisibility[track.id];
-                    const hasMeasured = Boolean(visibility);
-                    const showPianoroll = !isPlaying || !hasMeasured || visibility?.pianoroll === true;
-                    const showScope = !isPlaying || !hasMeasured || visibility?.scope === true;
-                    const canvasClassName =
-                      showPianoroll && !showScope ? "phone-canvases only-pianoroll" : !showPianoroll && showScope ? "phone-canvases only-scope" : "phone-canvases";
-                    const widgetClassName = [
-                      "phone-widget",
-                      activeTrackIDs.has(track.id.toUpperCase()) ? "active" : "",
-                      isPlaying && hasMeasured && !showPianoroll && !showScope ? "hidden" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ");
-
-                    return (
-                      <article className={widgetClassName} key={track.id} style={{ "--track-color": track.color } as React.CSSProperties}>
-                        <header>
-                          <strong>{track.label}</strong>
-                        </header>
-                        <div className={canvasClassName}>
-                          <div className={showPianoroll ? "phone-canvas-slot" : "phone-canvas-slot hidden"}>
-                            <span>Piano</span>
-                            <canvas
-                              ref={(node) => setWidgetCanvasRef(track.id, "pianoroll", node)}
-                              aria-label={`${track.label} pianoroll`}
-                            />
-                          </div>
-                          <div className={showScope ? "phone-canvas-slot" : "phone-canvas-slot hidden"}>
-                            <span>Wave</span>
-                            <canvas
-                              ref={(node) => setWidgetCanvasRef(track.id, "scope", node)}
-                              aria-label={`${track.label} waveform`}
-                            />
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
-
-            <AudioVisualizer isPlaying={isPlaying} signalRef={visualSignalRef} />
-          </div>
-
           <section className="editor-panel" aria-label="Strudel code editor">
             <CodeMirror
               value={composition.code}
@@ -1327,6 +1277,61 @@ export default function Home() {
                 setComposition((current) => ({ ...current, code: value }));
               }}
             />
+
+            <div className="editor-visual-row">
+              <section className="stage-wrap compact-stage" aria-label="Live patch widgets">
+                <div className={isPlaying ? "phone-stage playing" : "phone-stage"}>
+                  <pre>{renderHighlightedCode(composition.code, activeCodeRanges)}</pre>
+                  <div
+                    className="phone-widgets"
+                    aria-label="Live track widgets"
+                    style={{ "--track-count": widgetTracks.length } as React.CSSProperties}
+                  >
+                    {widgetTracks.map((track) => {
+                      const visibility = widgetVisibility[track.id];
+                      const hasMeasured = Boolean(visibility);
+                      const showPianoroll = !isPlaying || !hasMeasured || visibility?.pianoroll === true;
+                      const showScope = !isPlaying || !hasMeasured || visibility?.scope === true;
+                      const canvasClassName =
+                        showPianoroll && !showScope ? "phone-canvases only-pianoroll" : !showPianoroll && showScope ? "phone-canvases only-scope" : "phone-canvases";
+                      const widgetClassName = [
+                        "phone-widget",
+                        activeTrackIDs.has(track.id.toUpperCase()) ? "active" : "",
+                        isPlaying && hasMeasured && !showPianoroll && !showScope ? "hidden" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
+
+                      return (
+                        <article className={widgetClassName} key={track.id} style={{ "--track-color": track.color } as React.CSSProperties}>
+                          <header>
+                            <strong>{track.label}</strong>
+                          </header>
+                          <div className={canvasClassName}>
+                            <div className={showPianoroll ? "phone-canvas-slot" : "phone-canvas-slot hidden"}>
+                              <span>Piano</span>
+                              <canvas
+                                ref={(node) => setWidgetCanvasRef(track.id, "pianoroll", node)}
+                                aria-label={`${track.label} pianoroll`}
+                              />
+                            </div>
+                            <div className={showScope ? "phone-canvas-slot" : "phone-canvas-slot hidden"}>
+                              <span>Wave</span>
+                              <canvas
+                                ref={(node) => setWidgetCanvasRef(track.id, "scope", node)}
+                                aria-label={`${track.label} waveform`}
+                              />
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+
+              <AudioVisualizer isPlaying={isPlaying} signalRef={visualSignalRef} />
+            </div>
           </section>
 
         </div>

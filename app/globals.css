@@ -297,8 +297,7 @@ select:focus {
   gap: 0.45rem;
 }
 
-.settings-field span,
-.settings-help {
+.settings-field span {
   color: #7e877e;
   font-size: 0.72rem;
 }
@@ -306,10 +305,6 @@ select:focus {
 .settings-field input {
   background: #000;
   border-color: #242824;
-}
-
-.settings-help {
-  line-height: 1.35;
 }
 
 .status {
@@ -347,7 +342,7 @@ select:focus {
 .main-panel {
   display: grid;
   gap: 0.5rem;
-  grid-template-columns: minmax(20rem, 0.78fr) minmax(30rem, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
   min-width: 0;
   min-height: 0;
@@ -500,7 +495,8 @@ select:focus {
 .editor-panel {
   align-content: start;
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
+  gap: 0.5rem;
+  grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
   height: 100%;
   min-width: 0;
   min-height: 0;
@@ -511,6 +507,32 @@ select:focus {
 .code-editor-shell {
   height: 100%;
   min-height: 0;
+}
+
+.editor-visual-row {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-visual-row .stage-wrap,
+.editor-visual-row .visualizer-card {
+  min-height: 0;
+}
+
+.compact-stage .phone-stage {
+  aspect-ratio: auto;
+  height: 100%;
+  width: 100%;
+}
+
+.compact-stage .phone-widgets {
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-rows: repeat(var(--track-count), minmax(0, 1fr));
+  height: 100%;
 }
 
 .code-editor-shell.disabled .cm-content {
@@ -587,7 +609,7 @@ select:focus {
   }
 
   .main-panel {
-    grid-template-columns: minmax(18rem, 0.78fr) minmax(24rem, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -621,13 +643,17 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
-  .visual-panel {
-    grid-template-rows: minmax(28rem, auto) minmax(14rem, auto);
-  }
-
   .workspace {
     display: flex;
     flex-direction: column;
+  }
+
+  .editor-panel {
+    grid-template-rows: minmax(32rem, auto) minmax(24rem, auto);
+  }
+
+  .editor-visual-row {
+    grid-template-columns: 1fr;
   }
 
   .split-fields,
