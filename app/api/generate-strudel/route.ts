@@ -59,12 +59,17 @@ type GeneratedPatchResult = {
 };
 
 type VoiceSynthesisProvider = "gpt" | "kanana";
+type OpenAIContentItem =
+  | { type: "input_text"; text: string }
+  | { type: "input_image"; image_url: string; detail: "original" };
 
 const allowedStyles: StyleKey[] = ["dream", "club", "cinematic", "glitch", "ambient"];
 const maxRequestBodyBytes = 2_500_000;
 const freeDailyGptGenerationLimit = 5;
 const freeGptUsageCookieName = "strudel-free-gpt-usage";
 const kananaBaseUrl = "https://kanana-o.a2s-endpoint.kr-central-2.kakaocloud.com/v1";
+const defaultOpenAIModel = "gpt-5.5";
+const defaultOpenAICompileModel = "gpt-5-nano";
 const defaultShaderStyle = {
   foggy: 0.46,
   glitch: 0.18,
@@ -74,6 +79,17 @@ const defaultShaderStyle = {
   scanline: 0.22,
 };
 type ShaderStyle = typeof defaultShaderStyle;
+
+function getOpenAIModel() {
+  return process.env.OPENAI_MODEL?.trim() || defaultOpenAIModel;
+}
+
+function getOpenAICompileModels() {
+  const compileModel = process.env.OPENAI_COMPILE_MODEL?.trim() || defaultOpenAICompileModel;
+  const mainModel = getOpenAIModel();
+
+  return [compileModel, mainModel].filter((model, index, models) => model && models.indexOf(model) === index);
+}
 
 function todayCookieKey() {
   return new Date().toISOString().slice(0, 10);
@@ -272,6 +288,76 @@ function normalizeVoiceTexture(voiceTexture?: Partial<VoiceTexture>): VoiceTextu
   };
 }
 
+function buildStrudelPatchJsonSchema({
+  mode,
+  variantCount,
+  voiceTextureEnabled,
+}: {
+  mode: "generate" | "evolve" | "bridge";
+  variantCount: number;
+  voiceTextureEnabled: boolean;
+}) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["variants", "voiceTexture"],
+    properties: {
+      voiceTexture: {
+        type: "object",
+        additionalProperties: false,
+        required: ["enabled", "text", "words", "language", "chopPattern"],
+        properties: {
+          enabled: { type: "boolean" },
+          text: { type: "string" },
+          words: {
+            type: "array",
+            minItems: mode === "bridge" || !voiceTextureEnabled ? 0 : 5,
+            maxItems: 9,
+            items: { type: "string" },
+          },
+          language: { type: "string", enum: ["ko", "en", "hybrid", "abstract"] },
+          chopPattern: { type: "string" },
+        },
+      },
+      variants: {
+        type: "array",
+        minItems: variantCount,
+        maxItems: variantCount,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["title", "bpm", "style", "analysis", "shaderStyle", "code", "tracks"],
+          properties: {
+            title: { type: "string" },
+            bpm: { type: "number", minimum: 60, maximum: 190 },
+            style: { type: "string", enum: allowedStyles },
+            analysis: { type: "string" },
+            shaderStyle: {
+              type: "object",
+              additionalProperties: false,
+              required: ["foggy", "glitch", "liquid", "metallic", "bloom", "scanline"],
+              properties: {
+                foggy: { type: "number", minimum: 0, maximum: 1 },
+                glitch: { type: "number", minimum: 0, maximum: 1 },
+                liquid: { type: "number", minimum: 0, maximum: 1 },
+                metallic: { type: "number", minimum: 0, maximum: 1 },
+                bloom: { type: "number", minimum: 0, maximum: 1 },
+                scanline: { type: "number", minimum: 0, maximum: 1 },
+              },
+            },
+            code: { type: "string" },
+            tracks: {
+              type: "array",
+              minItems: 4,
+              items: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 function writeAscii(view: DataView, offset: number, value: string) {
   for (let index = 0; index < value.length; index += 1) {
     view.setUint8(offset + index, value.charCodeAt(index));
@@ -434,10 +520,7 @@ async function generateWithGpt({
   }
 
   const client = new OpenAI({ apiKey });
-  const content: Array<
-    | { type: "input_text"; text: string }
-    | { type: "input_image"; image_url: string; detail: "original" }
-  > = [
+  const content: OpenAIContentItem[] = [
     {
       type: "input_text",
       text: buildUserPrompt({ prompt, bpm, style, imageName, mode, variantCount, voiceTextureEnabled, parents }),
@@ -453,7 +536,7 @@ async function generateWithGpt({
   }
 
   const response = await client.responses.create({
-    model: process.env.OPENAI_MODEL || "gpt-5.5",
+    model: getOpenAIModel(),
     input: [
       {
         role: "user",
@@ -467,65 +550,7 @@ async function generateWithGpt({
         type: "json_schema",
         name: "strudel_image_patch",
         strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          required: ["variants", "voiceTexture"],
-          properties: {
-            voiceTexture: {
-              type: "object",
-              additionalProperties: false,
-              required: ["enabled", "text", "words", "language", "chopPattern"],
-              properties: {
-                enabled: { type: "boolean" },
-                text: { type: "string" },
-                words: {
-                  type: "array",
-                  minItems: mode === "bridge" || !voiceTextureEnabled ? 0 : 5,
-                  maxItems: 9,
-                  items: { type: "string" },
-                },
-                language: { type: "string", enum: ["ko", "en", "hybrid", "abstract"] },
-                chopPattern: { type: "string" },
-              },
-            },
-            variants: {
-              type: "array",
-              minItems: variantCount,
-              maxItems: variantCount,
-              items: {
-                type: "object",
-                additionalProperties: false,
-                required: ["title", "bpm", "style", "analysis", "shaderStyle", "code", "tracks"],
-                properties: {
-                  title: { type: "string" },
-                  bpm: { type: "number", minimum: 60, maximum: 190 },
-                  style: { type: "string", enum: allowedStyles },
-                  analysis: { type: "string" },
-                  shaderStyle: {
-                    type: "object",
-                    additionalProperties: false,
-                    required: ["foggy", "glitch", "liquid", "metallic", "bloom", "scanline"],
-                    properties: {
-                      foggy: { type: "number", minimum: 0, maximum: 1 },
-                      glitch: { type: "number", minimum: 0, maximum: 1 },
-                      liquid: { type: "number", minimum: 0, maximum: 1 },
-                      metallic: { type: "number", minimum: 0, maximum: 1 },
-                      bloom: { type: "number", minimum: 0, maximum: 1 },
-                      scanline: { type: "number", minimum: 0, maximum: 1 },
-                    },
-                  },
-                  code: { type: "string" },
-                  tracks: {
-                    type: "array",
-                    minItems: 4,
-                    items: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-        },
+        schema: buildStrudelPatchJsonSchema({ mode, variantCount, voiceTextureEnabled }),
       },
     },
   });
@@ -533,7 +558,53 @@ async function generateWithGpt({
   return parseGeneratedPatch(response.output_text, bpm, style, variantCount);
 }
 
-async function generateWithKanana({
+function buildKananaDraftPrompt({
+  prompt,
+  bpm,
+  style,
+  imageName,
+  mode,
+  variantCount,
+  voiceTextureEnabled,
+  parents,
+}: Required<Pick<GenerateRequest, "prompt" | "bpm" | "style">> & Pick<GenerateRequest, "imageName" | "parents"> & { mode: "generate" | "evolve" | "bridge"; variantCount: number; voiceTextureEnabled: boolean }) {
+  const parentBlock = parents?.length
+    ? `\nReference patches:\n${parents.map((parent, index) => `Parent ${index + 1}
+- Title: ${parent.title ?? "untitled"}
+- BPM: ${parent.bpm ?? "unknown"}
+- Style: ${parent.style ?? "unknown"}
+- Analysis: ${parent.analysis ?? "none"}
+- Code summary: ${(parent.code ?? "").slice(0, 1200)}`).join("\n\n")}`
+    : "";
+
+  return [
+    "You are Kanana, the local interpretation layer for an image-to-code-music system.",
+    "Do not write executable Strudel code. Do not write JSON. Do not use markdown fences.",
+    "Write a concise creative draft that GPT will compile into strict executable Strudel later.",
+    "",
+    "Focus on Korean/local language sensitivity, movement, rhythm, image mood, voice texture words, and sound palette.",
+    "",
+    `Prompt: ${prompt}`,
+    `Image name: ${imageName || "none"}`,
+    `Mode: ${mode}`,
+    `Requested variants: ${variantCount}`,
+    `BPM hint: ${bpm}`,
+    `Style hint: ${style}`,
+    `Voice texture enabled: ${voiceTextureEnabled ? "yes" : "no"}`,
+    parentBlock,
+    "",
+    "Return these sections in plain text:",
+    "1. Image reading: 3-5 short bullets.",
+    "2. Performance DNA: bpm, style, key/scale, drum backbone, bass motion, density.",
+    "3. Track intentions: BASS, DRUMS, MEL, SYNTH, optional LIGHT/TEXTURE, optional VOICE.",
+    "4. Voice texture words: 5-9 short words or syllables, comma-separated.",
+    "5. Variant directions: one short line per requested variant.",
+    "",
+    "Keep the whole draft under 900 words.",
+  ].filter(Boolean).join("\n");
+}
+
+async function createKananaDraft({
   prompt,
   bpm,
   style,
@@ -555,7 +626,7 @@ async function generateWithKanana({
   > = [
     {
       type: "text",
-      text: buildUserPrompt({ prompt, bpm, style, imageName, mode, variantCount, voiceTextureEnabled, parents }),
+      text: buildKananaDraftPrompt({ prompt, bpm, style, imageName, mode, variantCount, voiceTextureEnabled, parents }),
     },
   ];
   const imageBase64 = stripDataUrlPrefix(imageDataUrl);
@@ -582,7 +653,131 @@ async function generateWithKanana({
     throw new Error("Kanana returned an empty response");
   }
 
-  return parseGeneratedPatch(output, bpm, style, variantCount);
+  return output;
+}
+
+async function compileKananaDraftWithGpt({
+  draft,
+  prompt,
+  bpm,
+  style,
+  imageName,
+  imageDataUrl,
+  apiKey,
+  mode,
+  variantCount,
+  voiceTextureEnabled,
+  parents,
+}: Required<Pick<GenerateRequest, "prompt" | "bpm" | "style">> & Pick<GenerateRequest, "imageName" | "imageDataUrl" | "parents"> & { draft: string; apiKey: string; mode: "generate" | "evolve" | "bridge"; variantCount: number; voiceTextureEnabled: boolean }) {
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
+
+  const client = new OpenAI({ apiKey });
+  const content: OpenAIContentItem[] = [
+    {
+      type: "input_text",
+      text: [
+        "You are the GPT compiler layer for a Kanana-guided Strudel generator.",
+        "Kanana provided a creative/local interpretation draft. Your job is to compile it into the existing strict JSON schema and executable Strudel code.",
+        "",
+        "Preserve Kanana's image reading, movement language, voice words, and sound palette where possible.",
+        "However, executable correctness is mandatory. Every code string must pass JavaScript/Strudel syntax validation.",
+        "Do not mention that you are GPT. The output should read as a Kanana-guided generated patch.",
+        "",
+        buildUserPrompt({ prompt, bpm, style, imageName, mode, variantCount, voiceTextureEnabled, parents }),
+        "",
+        "Kanana creative draft:",
+        draft.slice(0, 6000),
+      ].join("\n"),
+    },
+  ];
+
+  if (imageDataUrl?.startsWith("data:image/")) {
+    content.push({
+      type: "input_image",
+      image_url: imageDataUrl,
+      detail: "original",
+    });
+  }
+
+  let lastError: unknown;
+
+  for (const model of getOpenAICompileModels()) {
+    try {
+      const response = await client.responses.create({
+        model,
+        input: [
+          {
+            role: "user",
+            content: content as never,
+          },
+        ],
+        reasoning: { effort: "low" },
+        text: {
+          verbosity: "low",
+          format: {
+            type: "json_schema",
+            name: "kanana_guided_strudel_patch",
+            strict: true,
+            schema: buildStrudelPatchJsonSchema({ mode, variantCount, voiceTextureEnabled }),
+          },
+        },
+      });
+
+      return await parseGeneratedPatch(response.output_text, bpm, style, variantCount);
+    } catch (error) {
+      lastError = error;
+      console.error(`Kanana GPT compile failed with ${model}`, error);
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+
+  throw new Error("Kanana GPT compile failed");
+}
+
+async function generateWithKanana({
+  prompt,
+  bpm,
+  style,
+  imageName,
+  imageDataUrl,
+  kananaApiKey,
+  gptApiKey,
+  mode,
+  variantCount,
+  voiceTextureEnabled,
+  parents,
+}: Required<Pick<GenerateRequest, "prompt" | "bpm" | "style">> & Pick<GenerateRequest, "imageName" | "imageDataUrl" | "parents"> & { kananaApiKey: string; gptApiKey: string; mode: "generate" | "evolve" | "bridge"; variantCount: number; voiceTextureEnabled: boolean }) {
+  const draft = await createKananaDraft({
+    prompt,
+    bpm,
+    style,
+    imageName,
+    imageDataUrl,
+    apiKey: kananaApiKey,
+    mode,
+    variantCount,
+    voiceTextureEnabled,
+    parents,
+  });
+
+  return compileKananaDraftWithGpt({
+    draft,
+    prompt,
+    bpm,
+    style,
+    imageName,
+    imageDataUrl,
+    apiKey: gptApiKey,
+    mode,
+    variantCount,
+    voiceTextureEnabled,
+    parents,
+  });
 }
 
 function fallbackVariants({ prompt, bpm, style, imageName, variantCount }: { prompt: string; bpm: number; style: StyleKey; imageName?: string; variantCount: number }) {
@@ -633,6 +828,7 @@ export async function POST(request: Request) {
   const voiceTextureEnabled = mode !== "bridge" && body.voiceTextureEnabled === true;
   const parents = body.parents?.filter((parent) => parent.code?.trim()).slice(0, 4);
   const openaiApiKey = body.openaiApiKey?.trim();
+  const gptApiKey = openaiApiKey || process.env.OPENAI_API_KEY?.trim();
   const kananaApiKey = body.kananaApiKey?.trim() || process.env.KANANA_API_KEY?.trim();
   const freeGptUsage = readFreeGptUsage(request);
   let freeGptCountToPersist: number | undefined;
@@ -647,13 +843,24 @@ export async function POST(request: Request) {
         providerFallback = true;
       } else {
         try {
+          if (!openaiApiKey) {
+            if (freeGptUsage.count >= freeDailyGptGenerationLimit) {
+              return NextResponse.json({
+                error: "AI generation is busy.",
+                requiresApiKey: true,
+              }, { status: 429 });
+            }
+            freeGptCountToPersist = freeGptUsage.count + 1;
+          }
+
           generated = await generateWithKanana({
             prompt,
             bpm,
             style,
             imageName: body.imageName,
             imageDataUrl: body.imageDataUrl,
-            apiKey: kananaApiKey,
+            kananaApiKey,
+            gptApiKey: gptApiKey ?? "",
             mode,
             variantCount,
             voiceTextureEnabled,
@@ -668,8 +875,7 @@ export async function POST(request: Request) {
     }
 
     if (!generated) {
-      const gptApiKey = openaiApiKey || process.env.OPENAI_API_KEY?.trim();
-      if (!openaiApiKey) {
+      if (!openaiApiKey && freeGptCountToPersist === undefined) {
         if (freeGptUsage.count >= freeDailyGptGenerationLimit) {
           return NextResponse.json({
             error: "AI generation is busy.",

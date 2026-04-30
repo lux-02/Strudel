@@ -42,7 +42,7 @@ Strudel AI Visual Coder는 이미지를 입력값으로 삼아 사운드, 코드
 - **DJ식 큐 전환**: 재생 중 변주를 선택하면 다음 마디 기준으로 큐하고, AI bridge를 통해 긴 크로스페이드를 시도합니다.
 - **AI Visual Style Generator**: 이미지 분석 결과로 `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, `scanline` 값을 생성합니다.
 - **Semantic Vocal Chop 옵션**: 기본 생성에서는 TTS를 끄고, Settings에서 Voice Texture TTS를 켜면 이미지에서 추출한 단어와 형태소를 AI 음성으로 합성해 `$VOICE` 트랙에서 보컬 찹처럼 사용합니다.
-- **GPT / Kanana 선택**: 기본은 OpenAI GPT이며, Settings에서 Kanana-compatible endpoint를 선택할 수 있습니다. GPT 무료 생성 한도를 넘으면 Settings에서 개인 OpenAI API Key를 입력해 계속 사용할 수 있습니다.
+- **GPT / Kanana 선택**: 기본은 OpenAI GPT입니다. Kanana 선택 시 Kanana가 이미지의 로컬/언어적 감각 초안을 만들고, GPT가 이를 실행 가능한 Strudel 코드로 컴파일합니다. GPT 무료 생성 한도를 넘으면 Settings에서 개인 OpenAI API Key를 입력해 계속 사용할 수 있습니다.
 - **무료 생성 한도**: 비로그인 사용자는 브라우저 쿠키 기준 하루 5회까지 서버 GPT 키로 생성할 수 있고, 이후에는 개인 API Key 입력이 필요합니다.
 - **HEIC/HEIF 지원**: iPhone 이미지는 브라우저에서 JPEG로 변환한 뒤 분석합니다.
 
@@ -80,6 +80,7 @@ cp .env.example .env.local
 ```env
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
+OPENAI_COMPILE_MODEL=gpt-5-nano
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
 OPENAI_TTS_VOICE=ash
 KANANA_API_KEY=
@@ -87,6 +88,7 @@ KANANA_API_KEY=
 
 - `OPENAI_API_KEY`: 서버 GPT 키입니다. 비로그인 무료 생성 한도 안에서 GPT 기반 이미지 분석과 Strudel 생성에 사용됩니다.
 - `OPENAI_MODEL`: 사용할 OpenAI 모델명입니다. 기본값은 `gpt-5.5`입니다.
+- `OPENAI_COMPILE_MODEL`: Kanana 초안을 Strudel JSON/code로 컴파일할 때 먼저 사용할 저비용 OpenAI 모델명입니다. 기본값은 `gpt-5-nano`이며, 실패 시 `OPENAI_MODEL`로 재시도합니다.
 - `OPENAI_TTS_MODEL`: Voice Texture TTS 옵션을 켰을 때 사용할 TTS 모델입니다. 기본값은 `gpt-4o-mini-tts`입니다.
 - `OPENAI_TTS_VOICE`: Voice Texture TTS 옵션을 켰을 때 사용할 음성입니다. 기본값은 `ash`입니다.
 - `KANANA_API_KEY`: Kanana provider를 사용할 때의 서버 기본 키입니다. 사용자가 Settings에서 직접 입력할 수도 있습니다.
@@ -96,6 +98,7 @@ KANANA_API_KEY=
 ### API 비용 보호
 
 - 서버 GPT 키를 사용하는 무료 생성은 브라우저 쿠키 기준 하루 5회로 제한됩니다.
+- Kanana 선택도 GPT 컴파일 레이어를 사용하므로 서버 GPT 키를 쓰는 경우 무료 생성 한도를 차감합니다.
 - 무료 한도를 넘으면 API는 `AI generation is busy.`를 반환하고, 앱은 Settings를 열어 개인 OpenAI API Key 입력을 안내합니다.
 - Settings에 입력한 OpenAI/Kanana API Key는 브라우저 `localStorage`에 저장되고 생성 요청 시에만 서버 API route로 전달됩니다.
 - Voice Texture TTS는 기본적으로 꺼져 있으며, Settings에서 명시적으로 켠 경우에만 TTS API를 호출합니다.
@@ -137,7 +140,7 @@ types/
 | Music Engine | `@strudel/web` |
 | Visual Widgets | `@strudel/draw`, custom canvas routing |
 | Shader | WebGL canvas |
-| AI | OpenAI Responses API, optional Kanana-compatible endpoint |
+| AI | OpenAI Responses API, optional Kanana-guided draft layer |
 | Deployment | Vercel |
 
 ### Generation Pipeline
@@ -146,9 +149,9 @@ types/
 flowchart LR
   A["Image Upload"] --> B["Client Compression<br/>HEIC/HEIF to JPEG"]
   B --> C["/api/generate-strudel"]
-  C --> D["Image Analysis<br/>GPT or Kanana"]
-  D --> E["Strudel Patch JSON<br/>Variants A/B/C/D"]
-  D --> F["Voice Texture<br/>Words / Morphemes"]
+  C --> D["Image Analysis<br/>GPT or Kanana Draft"]
+  D --> E["GPT Compile<br/>Strict Strudel JSON"]
+  E --> F["Voice Texture<br/>Words / Morphemes"]
   F --> G["TTS<br/>OpenAI or Kanana Audio"]
   G --> H["Register `voice` Sample"]
   E --> I["CodeMirror Editor"]
@@ -196,12 +199,13 @@ Vercel 프로젝트에 다음 환경변수를 설정합니다.
 ```text
 OPENAI_API_KEY
 OPENAI_MODEL
+OPENAI_COMPILE_MODEL
 OPENAI_TTS_MODEL
 OPENAI_TTS_VOICE
 KANANA_API_KEY
 ```
 
-`OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`, `KANANA_API_KEY`는 해당 옵션을 사용할 때만 필요합니다.
+`OPENAI_COMPILE_MODEL`, `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`, `KANANA_API_KEY`는 해당 옵션을 사용할 때만 필요합니다.
 
 빌드 명령:
 
@@ -214,7 +218,7 @@ npm run build
 - 업로드 이미지는 API 요청 크기 제한을 피하기 위해 클라이언트에서 압축됩니다.
 - 모바일 브라우저에서는 오디오 정책, WebGL 성능, 코드 편집 UX가 불안정할 수 있어 데스크톱 전용 안내 화면을 표시합니다.
 - AI가 생성한 Strudel 코드에 브라우저 런타임과 맞지 않는 표현이 들어올 수 있어 `normalizeStrudelCode`에서 일부 표현을 보정합니다.
-- 서버는 생성된 Strudel 코드를 브라우저에 보내기 전에 문법 검사를 수행하며, Kanana 결과가 유효하지 않으면 GPT fallback 경로를 사용합니다.
+- 서버는 생성된 Strudel 코드를 브라우저에 보내기 전에 문법 검사를 수행합니다. Kanana 선택 시에는 Kanana 초안을 GPT가 strict JSON/Strudel 코드로 컴파일하고, 그래도 실패하면 GPT 직접 생성 fallback 경로를 사용합니다.
 - 브라우저 자동재생 정책 때문에 `Generate` 또는 `Play` 시점에 오디오 컨텍스트를 먼저 깨웁니다.
 - Voice Texture TTS를 켠 경우 `$VOICE` 트랙에 쓰이는 음성은 AI로 생성된 보이스 텍스처이며, 사람의 실제 녹음이 아닙니다.
 
@@ -250,7 +254,7 @@ The interface is built for visual music capture: generated code, piano rolls, wa
 - **Quantized DJ-style switching**: Queues variant changes on musical boundaries and uses AI bridge patches for longer transitions.
 - **AI Visual Style Generator**: Produces shader parameters such as `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, and `scanline`.
 - **Optional Semantic Vocal Chop**: TTS is off by default. When Voice Texture TTS is enabled in Settings, image-derived words and morphemes are synthesized into an AI voice texture for the `$VOICE` track.
-- **GPT / Kanana provider selection**: Defaults to OpenAI GPT and optionally supports a Kanana-compatible endpoint. After the free GPT quota is used, users can add their own OpenAI API key in Settings.
+- **GPT / Kanana provider selection**: Defaults to OpenAI GPT. When Kanana is selected, Kanana drafts the local/image interpretation and GPT compiles it into executable Strudel. After the free GPT quota is used, users can add their own OpenAI API key in Settings.
 - **Free generation quota**: Anonymous users can generate up to 5 times per day with the server GPT key, tracked by a browser cookie.
 - **HEIC/HEIF support**: Converts iPhone images to JPEG in the browser before analysis.
 
@@ -278,18 +282,20 @@ cp .env.example .env.local
 ```env
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
+OPENAI_COMPILE_MODEL=gpt-5-nano
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
 OPENAI_TTS_VOICE=ash
 KANANA_API_KEY=
 ```
 
-`OPENAI_API_KEY` is the server GPT key used for the anonymous free generation quota. Users can continue with their own OpenAI API key in Settings after the free quota is used.
+`OPENAI_API_KEY` is the server GPT key used for the anonymous free generation quota. `OPENAI_COMPILE_MODEL` is the lower-cost OpenAI model used first when compiling Kanana drafts into strict Strudel JSON/code, with fallback to `OPENAI_MODEL` if validation fails. Users can continue with their own OpenAI API key in Settings after the free quota is used.
 
 Never commit real API keys. `.env*` files are ignored by Git.
 
 ### API Cost Guardrails
 
 - Free GPT generation with the server key is limited to 5 generations per day per browser cookie.
+- Kanana selection also uses the GPT compile layer, so it counts against the free GPT quota when the server GPT key is used.
 - After the free quota is used, the API returns `AI generation is busy.` and the app opens Settings so users can add their own OpenAI API key.
 - OpenAI and Kanana API keys entered in Settings are stored in browser `localStorage` and sent only to the server API route during generation.
 - Voice Texture TTS is off by default and only calls a TTS API when explicitly enabled in Settings.
@@ -310,12 +316,13 @@ Set these variables in your Vercel project:
 ```text
 OPENAI_API_KEY
 OPENAI_MODEL
+OPENAI_COMPILE_MODEL
 OPENAI_TTS_MODEL
 OPENAI_TTS_VOICE
 KANANA_API_KEY
 ```
 
-`OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`, and `KANANA_API_KEY` are only required when those optional paths are used.
+`OPENAI_COMPILE_MODEL`, `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`, and `KANANA_API_KEY` are only required when those optional paths are used.
 
 Build command:
 
@@ -328,7 +335,7 @@ npm run build
 - Desktop browser required. Mobile visitors are shown a desktop-only notice.
 - Uploaded images are compressed client-side to avoid request size limits.
 - AI-generated Strudel may include unstable expressions, so `normalizeStrudelCode` applies compatibility fixes before playback.
-- Generated Strudel is syntax-checked on the server before reaching the browser; invalid Kanana output can fall back to GPT generation.
+- Generated Strudel is syntax-checked on the server before reaching the browser. Kanana output is treated as a creative draft, compiled by GPT into strict JSON/Strudel, and can still fall back to direct GPT generation if compilation fails.
 - Browser autoplay rules can affect audio startup; the app tries to unlock the audio context during `Generate` or `Play`.
 - When Voice Texture TTS is enabled, the `$VOICE` track uses an AI-generated voice texture, not a human recording.
 
