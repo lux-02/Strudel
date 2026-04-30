@@ -327,6 +327,26 @@ select:focus {
   text-align: center;
 }
 
+.footer-links {
+  align-items: center;
+  color: #687168;
+  display: inline-flex;
+  font-size: 0.68rem;
+  gap: 0.36rem;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.footer-links a {
+  color: #7f897f;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: #ffffff;
+}
+
 .service-link {
   color: #9aa39a;
   font-size: 0.72rem;

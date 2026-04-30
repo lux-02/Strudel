@@ -2,7 +2,7 @@
 
 Image-to-Strudel live coding workspace for AI-assisted visual music performance.
 
-[Live app](https://strudel.n2f.site)
+[Live app](https://strudel.n2f.site) · [Examples](https://www.instagram.com/new.here.hero/) · [GitHub](https://github.com/lux-02/Strudel)
 
 ![Strudel AI Visual Coder preview](./public/readme-preview.png)
 
@@ -19,6 +19,16 @@ Strudel AI Visual Coder turns an uploaded image into executable Strudel code, tr
 Strudel AI Visual Coder는 이미지를 분석해 Strudel 음악 코드와 오디오 반응형 비주얼을 생성하는 웹앱입니다. 이미지를 업로드하면 AI가 색감, 질감, 공간감, 대비, 장면 분위기를 해석하고, 브라우저에서 바로 재생 가능한 Strudel 패치를 만듭니다.
 
 생성된 패치는 코드 에디터에서 직접 수정할 수 있고, 트랙별 피아노롤/웨이브폼과 WebGL 셰이더가 함께 반응합니다. 화면 캡처나 영상 합성에 사용할 수 있도록 코드, 위젯, 셰이더가 한 화면에 배치됩니다.
+
+### 창작 의도
+
+Strudel AI Visual Coder는 이미지를 입력값으로 삼아 사운드, 코드, 시각 신호를 동시에 생성하는 웹 기반 창작 도구입니다. 사용자가 업로드한 이미지는 색, 대비, 질감, 밀도, 공간감 등의 요소로 분석되고, 이 분석 결과는 Strudel 코드와 오디오 반응형 셰이더, 트랙별 시각 위젯으로 변환됩니다.
+
+이 도구는 이미지를 완성된 음악으로 번역하기보다, 이미지가 소리로 조직되는 과정을 화면 위에 드러냅니다. 리듬, 음색, 보이스 조각, 코드의 구조는 하나의 결과물이 아니라 계속 수정 가능한 상태로 제시됩니다. 사용자는 생성된 패치를 재생하거나 편집하면서 이미지와 사운드 사이의 관계를 다시 조정할 수 있습니다.
+
+새롭게 추가된 `$VOICE` 트랙은 이미지 분석 과정에서 추출된 단어와 형태소를 음성 샘플로 변환한 뒤, 이를 잘게 나누어 리듬의 일부로 사용합니다. 이때 목소리는 설명이나 내레이션이 아니라, 이미지가 언어를 거쳐 사운드로 이동하는 과정에서 발생하는 재료로 작동합니다.
+
+이 도구에서 코드는 단순한 제어 수단이 아니라, 이미지와 사운드 사이의 변환 과정을 가시화하는 매체입니다. 화면에 드러난 코드는 실행되는 동시에 읽히며, 사용자는 결과뿐 아니라 생성과 변형의 절차를 함께 마주하게 됩니다.
 
 ### 주요 기능
 
@@ -91,7 +101,7 @@ KANANA_API_KEY=
 | `npm run build` | 프로덕션 빌드 |
 | `npm run start` | 빌드된 앱 실행 |
 
-### 프로젝트 구조
+### Project Structure
 
 ```text
 app/
@@ -109,7 +119,7 @@ types/
   *.d.ts                         # 타입 보강
 ```
 
-### 기술 스택
+### Tech Stack
 
 | Area | Stack |
 | --- | --- |
@@ -121,6 +131,55 @@ types/
 | Shader | WebGL canvas |
 | AI | OpenAI Responses API, optional Kanana-compatible endpoint |
 | Deployment | Vercel |
+
+### Generation Pipeline
+
+```mermaid
+flowchart LR
+  A["Image Upload"] --> B["Client Compression<br/>HEIC/HEIF to JPEG"]
+  B --> C["/api/generate-strudel"]
+  C --> D["Image Analysis<br/>GPT or Kanana"]
+  D --> E["Strudel Patch JSON<br/>Variants A/B/C/D"]
+  D --> F["Voice Texture<br/>Words / Morphemes"]
+  F --> G["TTS<br/>OpenAI or Kanana Audio"]
+  G --> H["Register `voice` Sample"]
+  E --> I["CodeMirror Editor"]
+  E --> J["@strudel/web Runtime"]
+  H --> J
+  I --> J
+  J --> K["Track Widgets<br/>Pianoroll / Waveform"]
+  J --> L["Audio-Reactive Shader"]
+```
+
+### Runtime Architecture
+
+```mermaid
+flowchart TB
+  subgraph Client["Next.js Client"]
+    Upload["Image Upload"]
+    Editor["CodeMirror"]
+    Runtime["@strudel/web"]
+    Widgets["Canvas Widgets"]
+    Shader["WebGL Shader"]
+  end
+
+  subgraph Server["Next.js API Route"]
+    Prompt["Prompt Builder"]
+    Model["GPT / Kanana"]
+    Syntax["Strudel Syntax Check"]
+    TTS["TTS / Audio Stream"]
+  end
+
+  Upload --> Server
+  Prompt --> Model
+  Model --> Syntax
+  Model --> TTS
+  Syntax --> Editor
+  Syntax --> Runtime
+  TTS --> Runtime
+  Runtime --> Widgets
+  Runtime --> Shader
+```
 
 ### 배포
 

@@ -1947,6 +1947,15 @@ export default function Home() {
           </div>
 
           <div className="panel-footer">
+            <div className="footer-links" aria-label="Project links">
+              <a href="https://github.com/lux-02/Strudel" target="_blank" rel="noreferrer">
+                GitHub
+              </a>
+              <span aria-hidden="true">·</span>
+              <a href="https://www.instagram.com/new.here.hero/" target="_blank" rel="noreferrer">
+                Examples
+              </a>
+            </div>
             <a className="service-link" href="https://strudel.n2f.site" target="_blank" rel="noreferrer">
               strudel.n2f.site
             </a>
