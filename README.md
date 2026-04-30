@@ -1,97 +1,48 @@
 # Strudel AI Visual Coder
 
-이미지를 음악 코드, 라이브 패치 위젯, 오디오 반응형 셰이더로 변환하는 AI Music Visual Coding 웹앱입니다. 사용자가 이미지를 업로드하면 AI가 이미지의 색감, 질감, 공간감, 밝기, 장면성을 분석하고, 브라우저에서 바로 실행 가능한 Strudel 코드를 생성합니다.
+Image-to-Strudel live coding workspace for AI-assisted visual music performance.
 
-This is an AI music visual coding web app that turns an uploaded image into executable Strudel code, live patch widgets, and an audio-reactive shader. The app analyzes visual mood, texture, color, space, and contrast, then generates a playable Strudel patch directly in the browser.
+[Live app](https://strudel.n2f.site)
 
-Live app: https://strudel.n2f.site
+![Strudel AI Visual Coder preview](./public/readme-preview.png)
+
+Strudel AI Visual Coder turns an uploaded image into executable Strudel code, track-level visual widgets, and an audio-reactive shader scene. It is designed for desktop live-coding workflows, short-form visual music capture, and performance-style iteration.
+
+> Desktop browser required. The app uses CodeMirror, WebGL, and browser audio APIs, so mobile visitors are shown a desktop-only notice.
 
 ---
 
 ## 한국어
 
-### 핵심 기능
+### 개요
 
-- **이미지 기반 Strudel 코드 생성**
-  - 이미지 업로드 후 `Generate`를 누르면 AI가 제목, BPM, 스타일, 트랙 구성, Strudel 코드를 생성합니다.
-  - 이미지를 업로드하지 않은 상태에서 `Generate`를 누르면 파일 선택창이 먼저 열립니다.
-  - iPhone HEIC/HEIF 이미지는 브라우저에서 JPEG로 변환한 뒤 분석에 사용합니다.
-  - 생성 코드는 `$DRUMS`, `$BASS`, `$MEL`, `$SYNTH`, `$LIGHT`, `$TEXTURE` 같은 트랙 라벨 구조를 사용합니다.
-  - 브라우저에서 바로 평가 가능한 Strudel 표현을 우선 사용하도록 프롬프트와 정규화 로직이 들어 있습니다.
+Strudel AI Visual Coder는 이미지를 분석해 Strudel 음악 코드와 오디오 반응형 비주얼을 생성하는 웹앱입니다. 이미지를 업로드하면 AI가 색감, 질감, 공간감, 대비, 장면 분위기를 해석하고, 브라우저에서 바로 재생 가능한 Strudel 패치를 만듭니다.
 
-- **브라우저 내 Strudel 실행**
-  - `@strudel/web` 기반으로 앱 내부에서 직접 재생합니다.
-  - 별도 Strudel REPL 임베드가 아니라, 앱의 CodeMirror 코드 에디터와 실행 엔진이 직접 연결됩니다.
+생성된 패치는 코드 에디터에서 직접 수정할 수 있고, 트랙별 피아노롤/웨이브폼과 WebGL 셰이더가 함께 반응합니다. 화면 캡처나 영상 합성에 사용할 수 있도록 코드, 위젯, 셰이더가 한 화면에 배치됩니다.
 
-- **라이브 코드 에디터**
-  - CodeMirror 기반 편집기입니다.
-  - 생성 후 코드를 바로 수정할 수 있습니다.
-  - 재생 중 코드를 편집하면 입력이 잠깐 멈춘 뒤 자동으로 최신 코드가 재평가됩니다.
-  - 재생 중 active range는 주변 코드를 낮은 채도/밝기로 가라앉히고, 현재 실행 중인 토큰은 원래 syntax color를 유지하는 방식으로 표시됩니다.
+### 주요 기능
 
-- **트랙별 피아노롤 / 웨이브폼**
-  - Strudel inline visual widget 방식에 맞춰 트랙별 피아노롤과 waveform scope를 보여줍니다.
-  - 화면에 실제로 신호가 있는 위젯만 남기도록 가시성 감지가 들어 있습니다.
-  - 하단 영역을 넓게 사용해 영상 오버레이용으로 읽기 쉽게 구성했습니다.
+- **이미지 기반 음악 생성**: 업로드한 이미지에서 제목, BPM, 스케일, 악기 구성, Strudel 코드를 생성합니다.
+- **트랙 라벨 구조**: `$DRUMS`, `$BASS`, `$MEL`, `$SYNTH`, `$LIGHT`, `$TEXTURE` 같은 트랙 단위 코드를 생성합니다.
+- **인앱 Strudel 실행**: `@strudel/web`을 사용해 별도 REPL 임베드 없이 앱 안에서 바로 재생합니다.
+- **라이브 코드 편집**: CodeMirror에서 생성된 Strudel 코드를 바로 수정하고, 재생 중에도 변경 내용을 재평가합니다.
+- **트랙별 비주얼 위젯**: 피아노롤과 waveform scope를 트랙별로 표시하고, 신호가 없는 위젯은 숨깁니다.
+- **오디오 반응형 셰이더**: 드럼, 베이스, 멜로디, 신스, 텍스처 신호가 각각 다른 WebGL 효과에 연결됩니다.
+- **Variant + Evolve**: A/B/C/D 변주를 생성하고, 현재 변주들을 바탕으로 이어지는 새 변주를 만듭니다.
+- **DJ식 큐 전환**: 재생 중 변주를 선택하면 다음 마디 기준으로 큐하고, AI bridge를 통해 긴 크로스페이드를 시도합니다.
+- **AI Visual Style Generator**: 이미지 분석 결과로 `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, `scanline` 값을 생성합니다.
+- **GPT / Kanana 선택**: 기본은 OpenAI GPT이며, Settings에서 Kanana-compatible endpoint를 선택할 수 있습니다.
+- **HEIC/HEIF 지원**: iPhone 이미지는 브라우저에서 JPEG로 변환한 뒤 분석합니다.
 
-- **오디오 반응형 GLSL 스타일 셰이더**
-  - 우측 패널 전체 배경에 셰이더가 깔립니다.
-  - 트랙별 신호가 서로 다른 시각 효과에 연결됩니다.
-  - `$DRUMS`: vertical burst, glitch slice, scanline intensity
-  - `$BASS`: low-frequency blob, subtle screen shake, bloom pulse
-  - `$MEL`: thin light filament, curve trail
-  - `$SYNTH`: liquid warp, feedback smear
-  - `$LIGHT` / `$TEXTURE`: grain, dust, afterimage
+### 사용 방법
 
-- **Variant Generation + Evolve**
-  - 한 번의 생성에서 A/B/C/D 변주를 만듭니다.
-  - `Evolve`는 현재 변주들을 부모로 삼아 같은 DJ set 안에서 자연스럽게 이어지는 새 변주를 만듭니다.
-  - 모든 변주는 같은 performance DNA, BPM, 스타일, 호환 가능한 key/scale을 유지하도록 설계되어 있습니다.
-
-- **DJ식 큐 전환**
-  - 재생 중 A/B/C/D를 누르면 즉시 끊지 않고 다음 마디 기준으로 큐됩니다.
-  - 너무 마디 끝에 가까운 시점에 누르면 한 마디 더 기다려 박자 밀림을 줄입니다.
-  - AI bridge 코드가 생성되면 8마디 이상 크로스페이드 구간으로 들어갑니다.
-  - 브릿지와 최종 변주는 React autoplay 경로가 아니라 Strudel 런타임 직접 evaluate 경로를 사용해 타이밍 밀림을 줄입니다.
-
-- **AI Visual Style Generator**
-  - 이미지 분석 결과로 `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, `scanline` 값을 생성합니다.
-  - Settings에서 직접 값을 조정할 수 있습니다.
-  - 재생 중에는 Settings 버튼이 비활성화되어 라이브 상태가 흔들리지 않도록 했습니다.
-
-- **AI 모델 선택**
-  - 기본 모델은 OpenAI GPT입니다.
-  - Settings에서 Kanana를 선택하고 API Key를 입력하면 Kanana API를 사용할 수 있습니다.
-  - Kanana 요청 실패 시 서버에서는 GPT 경로로 폴백할 수 있도록 구성되어 있습니다.
-
-### 기술 스택
-
-- **Framework**: Next.js App Router
-- **UI**: React
-- **Code Editor**: CodeMirror
-- **Music Engine**: `@strudel/web`
-- **Visual Widgets**: `@strudel/draw`, custom canvas routing
-- **Shader**: WebGL canvas
-- **AI**: OpenAI Responses API, optional Kanana-compatible endpoint
-- **Deployment**: Vercel
-
-### 프로젝트 구조
-
-```text
-app/
-  api/generate-strudel/route.ts  # 이미지 분석 및 Strudel 코드 생성 API
-  globals.css                    # 전체 UI, CodeMirror, shader/layout 스타일
-  page.tsx                       # 메인 앱, Strudel 런타임, 위젯, shader, variant 전환
-
-lib/
-  code-highlight.ts              # CodeMirror active range decoration
-  strudel-ai-prompt.ts           # AI 시스템 프롬프트 및 Strudel 코드 정규화
-  strudel-presets.ts             # fallback composition preset
-  strudel-runtime.ts             # Strudel widget canvas/runtime helper
-
-types/
-  *.d.ts                         # 타입 보강
-```
+1. 데스크톱 브라우저에서 [strudel.n2f.site](https://strudel.n2f.site)를 엽니다.
+2. 좌측 이미지 영역을 눌러 이미지를 업로드합니다.
+3. `Generate`를 눌러 A/B/C/D 변주를 생성합니다.
+4. 생성이 끝나면 첫 번째 패치가 로드되고 자동 재생됩니다.
+5. 코드 에디터에서 Strudel 코드를 직접 수정합니다.
+6. 재생 중 A/B/C/D를 눌러 변주를 큐합니다.
+7. `Code` 버튼으로 현재 Strudel 코드를 `.js` 파일로 저장합니다.
 
 ### 로컬 실행
 
@@ -100,7 +51,7 @@ npm install
 npm run dev
 ```
 
-브라우저에서 다음 주소를 엽니다.
+개발 서버:
 
 ```text
 http://localhost:3000
@@ -108,13 +59,11 @@ http://localhost:3000
 
 ### 환경변수
 
-`.env.example`을 참고해 `.env.local`을 만듭니다.
+`.env.example`을 복사해 `.env.local`을 만듭니다.
 
 ```bash
 cp .env.example .env.local
 ```
-
-필요한 값:
 
 ```env
 OPENAI_API_KEY=
@@ -122,30 +71,53 @@ OPENAI_MODEL=gpt-5.5
 KANANA_API_KEY=
 ```
 
-- `OPENAI_API_KEY`: GPT 기반 이미지 분석 및 Strudel 생성에 필요합니다.
+- `OPENAI_API_KEY`: GPT 기반 이미지 분석과 Strudel 생성에 필요합니다.
 - `OPENAI_MODEL`: 사용할 OpenAI 모델명입니다. 기본값은 `gpt-5.5`입니다.
-- `KANANA_API_KEY`: Kanana 선택 시 사용할 서버 기본 키입니다. 사용자가 Settings에서 직접 입력할 수도 있습니다.
+- `KANANA_API_KEY`: Kanana provider를 사용할 때의 서버 기본 키입니다. 사용자가 Settings에서 직접 입력할 수도 있습니다.
 
-> 실제 API Key는 `.env.local`에만 보관하세요. `.env*`는 `.gitignore`에 포함되어 있습니다.
+실제 API Key는 `.env.local`에만 보관하세요. `.env*` 파일은 Git에서 무시됩니다.
 
-### 사용 방법
+### 명령어
 
-1. 좌측 이미지 영역을 눌러 이미지를 업로드합니다.
-2. `Generate`를 누릅니다.
-3. AI가 이미지를 분석하고 A/B/C/D 변주를 생성합니다.
-4. 생성이 끝나면 자동으로 첫 번째 패치가 로드되고 재생됩니다.
-5. 코드 에디터에서 Strudel 코드를 직접 수정할 수 있습니다.
-6. 재생 중 A/B/C/D를 누르면 다음 마디 기준으로 큐되고, AI bridge를 거쳐 자연스럽게 전환됩니다.
-7. `Code` 버튼으로 현재 Strudel 코드를 `.js` 파일로 저장할 수 있습니다.
+| Command | Description |
+| --- | --- |
+| `npm run dev` | 로컬 개발 서버 실행 |
+| `npm run typecheck` | TypeScript 타입 검사 |
+| `npm run build` | 프로덕션 빌드 |
+| `npm run start` | 빌드된 앱 실행 |
 
-### 검증 명령어
+### 프로젝트 구조
 
-```bash
-npm run typecheck
-npm run build
+```text
+app/
+  api/generate-strudel/route.ts  # 이미지 분석 및 Strudel 코드 생성 API
+  globals.css                    # UI, CodeMirror, shader/layout 스타일
+  page.tsx                       # 메인 앱, Strudel 런타임, 위젯, shader, variant 전환
+
+lib/
+  code-highlight.ts              # CodeMirror active range decoration
+  strudel-ai-prompt.ts           # AI 시스템 프롬프트 및 코드 정규화
+  strudel-presets.ts             # fallback composition preset
+  strudel-runtime.ts             # Strudel widget canvas/runtime helper
+
+types/
+  *.d.ts                         # 타입 보강
 ```
 
-### Vercel 배포
+### 기술 스택
+
+| Area | Stack |
+| --- | --- |
+| Framework | Next.js App Router |
+| UI | React |
+| Code Editor | CodeMirror |
+| Music Engine | `@strudel/web` |
+| Visual Widgets | `@strudel/draw`, custom canvas routing |
+| Shader | WebGL canvas |
+| AI | OpenAI Responses API, optional Kanana-compatible endpoint |
+| Deployment | Vercel |
+
+### 배포
 
 Vercel 프로젝트에 다음 환경변수를 설정합니다.
 
@@ -155,18 +127,18 @@ OPENAI_MODEL
 KANANA_API_KEY
 ```
 
-빌드 명령은 기본 Next.js 설정을 사용합니다.
+빌드 명령:
 
 ```bash
 npm run build
 ```
 
-### 구현상 주의사항
+### 구현 메모
 
-- 이미지 파일은 API 요청 크기 제한을 피하기 위해 클라이언트에서 압축됩니다.
-- AI가 생성한 코드에 브라우저 Strudel에서 불안정한 표현이 들어올 수 있어 `normalizeStrudelCode`에서 일부 표현을 보정합니다.
-- 자동재생은 브라우저 오디오 정책의 영향을 받습니다. 앱은 `Generate` 클릭 시점에 오디오 컨텍스트를 먼저 깨워 자동재생 실패 가능성을 줄입니다.
-- 실제 API Key는 저장소에 커밋하지 마세요. `.env.local`은 `.gitignore`에 포함되어 있습니다.
+- 업로드 이미지는 API 요청 크기 제한을 피하기 위해 클라이언트에서 압축됩니다.
+- 모바일 브라우저에서는 오디오 정책, WebGL 성능, 코드 편집 UX가 불안정할 수 있어 데스크톱 전용 안내 화면을 표시합니다.
+- AI가 생성한 Strudel 코드에 브라우저 런타임과 맞지 않는 표현이 들어올 수 있어 `normalizeStrudelCode`에서 일부 표현을 보정합니다.
+- 브라우저 자동재생 정책 때문에 `Generate` 또는 `Play` 시점에 오디오 컨텍스트를 먼저 깨웁니다.
 
 ### 라이선스 및 Attribution
 
@@ -184,102 +156,25 @@ Strudel AI Visual Coder는 Strudel 생태계 위에 구축되어 있습니다. �
 
 ### Overview
 
-Strudel AI Visual Coder is a browser-based AI music visual coding tool. Upload an image, generate a set of Strudel patches, edit the code live, and perform with track-level visual widgets and an audio-reactive shader background.
+Strudel AI Visual Coder is a desktop-first web app that transforms an uploaded image into playable Strudel code, track-level visual widgets, and an audio-reactive WebGL shader. It analyzes visual mood, color, texture, space, and contrast, then generates a live-codable music patch directly in the browser.
 
-The product is designed for short-form visual music workflows: code, piano rolls, waveform scopes, and shader feedback can sit on top of image/video material as a screen-style overlay.
+The interface is built for visual music capture: generated code, piano rolls, waveform scopes, and shader feedback can be recorded or composited as a screen overlay.
 
-### Key Features
+### Features
 
-- **Image-to-Strudel Generation**
-  - Upload an image and click `Generate`.
-  - If no image has been uploaded yet, clicking `Generate` opens the file picker first.
-  - iPhone HEIC/HEIF images are converted to JPEG in the browser before analysis.
-  - The AI analyzes color, texture, contrast, space, material, and mood.
-  - It returns a title, BPM, style, track plan, shader style, and playable Strudel code.
-  - The generated code uses labeled tracks such as `$DRUMS`, `$BASS`, `$MEL`, `$SYNTH`, `$LIGHT`, and `$TEXTURE`.
+- **Image-to-Strudel generation**: Creates title, BPM, scale, instruments, shader style, and executable Strudel code from an uploaded image.
+- **Labeled track patches**: Generates track blocks such as `$DRUMS`, `$BASS`, `$MEL`, `$SYNTH`, `$LIGHT`, and `$TEXTURE`.
+- **In-app playback**: Uses `@strudel/web` directly instead of embedding the official REPL UI.
+- **Live CodeMirror editor**: Edit generated code immediately; changes are re-evaluated during playback.
+- **Track widgets**: Displays piano roll and waveform scope widgets per track, hiding empty widgets after signal detection.
+- **Audio-reactive shader**: Maps drums, bass, melody, synth, light, and texture signals to separate WebGL behaviors.
+- **Variant Generation + Evolve**: Generates A/B/C/D variants and evolves them into new compatible variations.
+- **Quantized DJ-style switching**: Queues variant changes on musical boundaries and uses AI bridge patches for longer transitions.
+- **AI Visual Style Generator**: Produces shader parameters such as `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, and `scanline`.
+- **GPT / Kanana provider selection**: Defaults to OpenAI GPT and optionally supports a Kanana-compatible endpoint.
+- **HEIC/HEIF support**: Converts iPhone images to JPEG in the browser before analysis.
 
-- **Native In-App Playback**
-  - Powered by `@strudel/web`.
-  - The app evaluates and plays Strudel code directly instead of embedding the official REPL UI.
-
-- **Live Code Editing**
-  - Built with CodeMirror.
-  - Generated code is editable immediately.
-  - While playing, code edits are debounced and re-evaluated automatically.
-  - Active code ranges are shown by dimming surrounding code while preserving the original syntax colors of the active tokens.
-
-- **Track-Level Piano Roll and Waveform Widgets**
-  - Each track can render inline Strudel-style piano roll or waveform scope widgets.
-  - Empty widgets are hidden after signal detection.
-  - The visual widget area is expanded horizontally for video overlay readability.
-
-- **Audio-Reactive Shader Background**
-  - A WebGL shader sits behind the entire right panel.
-  - Track signals influence different visual behaviors:
-  - `$DRUMS`: vertical bursts, glitch slices, scanline intensity
-  - `$BASS`: low-frequency blobs, subtle screen shake, bloom pulse
-  - `$MEL`: thin light filaments and curve trails
-  - `$SYNTH`: liquid warp and feedback smear
-  - `$LIGHT` / `$TEXTURE`: grain, dust, and afterimage trails
-
-- **Variant Generation and Evolve**
-  - Each generation returns A/B/C/D variants.
-  - `Evolve` creates new variations from the current set.
-  - Variants are constrained to behave like one DJ set: same BPM, same style, compatible key/scale, similar drum backbone, and similar bass root motion.
-
-- **Quantized DJ-Style Switching**
-  - Clicking A/B/C/D during playback queues the transition.
-  - If the click lands too close to the end of a bar, the transition waits one more bar.
-  - AI bridge patches are used for longer transitions.
-  - The bridge and final variant are evaluated directly through the Strudel runtime to reduce timing drift.
-
-- **AI Visual Style Generator**
-  - The AI also returns shader parameters:
-    - `foggy`
-    - `glitch`
-    - `liquid`
-    - `metallic`
-    - `bloom`
-    - `scanline`
-  - These can be edited in Settings.
-  - Settings are disabled during playback to keep the live state stable.
-
-- **Model Selection**
-  - Default provider: OpenAI GPT.
-  - Optional provider: Kanana-compatible endpoint.
-  - When Kanana is selected, the UI shows an API key input field.
-  - The server can fall back to GPT if the Kanana request fails.
-
-### Tech Stack
-
-- **Framework**: Next.js App Router
-- **UI**: React
-- **Code Editor**: CodeMirror
-- **Music Engine**: `@strudel/web`
-- **Visual Widgets**: `@strudel/draw`, custom canvas routing
-- **Shader**: WebGL canvas
-- **AI**: OpenAI Responses API, optional Kanana-compatible endpoint
-- **Deployment**: Vercel
-
-### Project Structure
-
-```text
-app/
-  api/generate-strudel/route.ts  # AI generation endpoint
-  globals.css                    # Global UI, CodeMirror, shader/layout styles
-  page.tsx                       # Main app, Strudel runtime, widgets, shader, variants
-
-lib/
-  code-highlight.ts              # CodeMirror active range decorations
-  strudel-ai-prompt.ts           # AI prompt and Strudel code normalization
-  strudel-presets.ts             # fallback composition preset
-  strudel-runtime.ts             # Strudel widget/runtime helpers
-
-types/
-  *.d.ts                         # Type declarations
-```
-
-### Local Development
+### Quick Start
 
 ```bash
 npm install
@@ -300,40 +195,26 @@ Create `.env.local` from `.env.example`.
 cp .env.example .env.local
 ```
 
-Variables:
-
 ```env
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
 KANANA_API_KEY=
 ```
 
-- `OPENAI_API_KEY`: Required for GPT-based image analysis and Strudel generation.
-- `OPENAI_MODEL`: OpenAI model name. Defaults to `gpt-5.5`.
-- `KANANA_API_KEY`: Optional server-side default key for the Kanana provider. Users can also provide a key from the Settings modal.
+Never commit real API keys. `.env*` files are ignored by Git.
 
-> Never commit real API keys. `.env*` files are ignored by Git.
+### Commands
 
-### Usage
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the local dev server |
+| `npm run typecheck` | Run TypeScript checks |
+| `npm run build` | Create a production build |
+| `npm run start` | Start the built app |
 
-1. Upload an image from the left panel.
-2. Click `Generate`.
-3. The AI creates A/B/C/D variants.
-4. The first patch loads and starts automatically.
-5. Edit Strudel code directly in the editor.
-6. During playback, click A/B/C/D to queue quantized transitions.
-7. Export the current Strudel code with the `Code` button.
+### Deployment
 
-### Validation
-
-```bash
-npm run typecheck
-npm run build
-```
-
-### Deploying to Vercel
-
-Set these environment variables in your Vercel project:
+Set these variables in your Vercel project:
 
 ```text
 OPENAI_API_KEY
@@ -349,10 +230,10 @@ npm run build
 
 ### Notes
 
+- Desktop browser required. Mobile visitors are shown a desktop-only notice.
 - Uploaded images are compressed client-side to avoid request size limits.
-- AI-generated Strudel can include unstable expressions, so `normalizeStrudelCode` applies small compatibility fixes before playback.
-- Browser autoplay rules can affect audio startup. The app tries to unlock the audio context at the moment the user clicks `Generate`.
-- Do not commit real API keys. `.env.local` is ignored by Git.
+- AI-generated Strudel may include unstable expressions, so `normalizeStrudelCode` applies compatibility fixes before playback.
+- Browser autoplay rules can affect audio startup; the app tries to unlock the audio context during `Generate` or `Play`.
 
 ### License and Attribution
 

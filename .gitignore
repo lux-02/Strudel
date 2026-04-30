@@ -9,4 +9,5 @@ coverage/
 .DS_Store
 .omx/
 *.png
+!public/readme-preview.png
 .vercel
