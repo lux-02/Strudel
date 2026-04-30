@@ -1,6 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#111312"/>
-  <path d="M14 42c10 0 10-20 20-20s10 20 20 20" fill="none" stroke="#17b6a4" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="22" cy="24" r="5" fill="#f5bd3d"/>
-  <circle cx="44" cy="40" r="5" fill="#ef5c5c"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Strudel AI Visual Coder</title>
+  <defs>
+    <radialGradient id="field" cx="52%" cy="48%" r="72%">
+      <stop offset="0%" stop-color="#18201d"/>
+      <stop offset="48%" stop-color="#050706"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+    <linearGradient id="filament" x1="84" x2="428" y1="368" y2="132" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6affef"/>
+      <stop offset="42%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f4c94b"/>
+    </linearGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.62 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <pattern id="scan" width="512" height="18" patternUnits="userSpaceOnUse">
+      <rect width="512" height="1" fill="#ffffff" opacity="0.055"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#field)"/>
+  <rect width="512" height="512" rx="108" fill="url(#scan)" opacity="0.55"/>
+  <g opacity="0.24">
+    <path d="M104 378h304M104 304h304M104 230h304M104 156h304" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+    <path d="M156 112v288M256 112v288M356 112v288" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <path d="M96 318c54-20 62-114 126-118 62-4 70 92 126 80 40-8 48-68 88-92" fill="none" stroke="#ffffff" stroke-width="58" stroke-linecap="round" stroke-linejoin="round" opacity="0.08"/>
+  <path d="M96 318c54-20 62-114 126-118 62-4 70 92 126 80 40-8 48-68 88-92" fill="none" stroke="url(#filament)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" filter="url(#soft)"/>
+  <path d="M96 318c54-20 62-114 126-118 62-4 70 92 126 80 40-8 48-68 88-92" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.86"/>
+  <g opacity="0.95">
+    <rect x="88" y="104" width="28" height="88" rx="14" fill="#6affef"/>
+    <rect x="128" y="80" width="20" height="136" rx="10" fill="#ffffff" opacity="0.56"/>
+    <rect x="168" y="122" width="24" height="70" rx="12" fill="#f4c94b"/>
+    <rect x="396" y="298" width="28" height="90" rx="14" fill="#ff6b6b"/>
+  </g>
 </svg>

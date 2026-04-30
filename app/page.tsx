@@ -1374,7 +1374,8 @@ export default function Home() {
 
   const requestVariants = useCallback(async (mode: "generate" | "evolve") => {
     if (!hasImageMood) {
-      setStatus("Add an image mood first");
+      openImagePicker();
+      setStatus("Choose an image mood first");
       return;
     }
     if (mode === "evolve" && variants.length === 0 && !patchReady) {
@@ -1653,7 +1654,7 @@ export default function Home() {
     setStatus("Exported code");
   }, [composition.code, patchReady]);
 
-  function readFileAsDataUrl(file: File) {
+  function readFileAsDataUrl(file: Blob) {
     return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result ?? ""));
@@ -1691,8 +1692,27 @@ export default function Home() {
     });
   }
 
+  function isHeicFile(file: File) {
+    const name = file.name.toLowerCase();
+    const type = file.type.toLowerCase();
+    return type.includes("heic") || type.includes("heif") || name.endsWith(".heic") || name.endsWith(".heif");
+  }
+
+  async function normalizeImageBlob(file: File) {
+    if (!isHeicFile(file)) return file;
+
+    const { default: heic2any } = await import("heic2any");
+    const converted = await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.9,
+    });
+    return Array.isArray(converted) ? converted[0] : converted;
+  }
+
   async function compressImageForGeneration(file: File) {
-    const sourceDataUrl = await readFileAsDataUrl(file);
+    const sourceBlob = await normalizeImageBlob(file);
+    const sourceDataUrl = await readFileAsDataUrl(sourceBlob);
     const sourceImage = await loadImage(sourceDataUrl);
     const sourceWidth = sourceImage.naturalWidth || sourceImage.width;
     const sourceHeight = sourceImage.naturalHeight || sourceImage.height;
@@ -1725,7 +1745,7 @@ export default function Home() {
     if (!file) return;
 
     try {
-      setStatus("Preparing image");
+      setStatus(isHeicFile(file) ? "Converting HEIC image" : "Preparing image");
       setImageName(file.name);
       const dataUrl = await compressImageForGeneration(file);
       setImageDataUrl(dataUrl);
@@ -1736,11 +1756,14 @@ export default function Home() {
       console.error(error);
       setImageDataUrl("");
       setImagePreview("");
-      setStatus("Could not prepare image");
+      setStatus(isHeicFile(file) ? "Could not convert HEIC image" : "Could not prepare image");
     }
   }
 
   function openImagePicker() {
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
     imageInputRef.current?.click();
   }
 
@@ -1766,13 +1789,13 @@ export default function Home() {
             ref={imageInputRef}
             className="image-file-input"
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             onClick={(event) => event.stopPropagation()}
             onChange={(event) => onImageChange(event.target.files?.[0])}
           />
 
           <div className="button-grid">
-            <button className="primary" onClick={generate} disabled={isGenerating || !hasImageMood}>
+            <button className="primary" onClick={generate} disabled={isGenerating}>
               {isGenerating ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
               {isGenerating ? "Generating" : "Generate"}
             </button>

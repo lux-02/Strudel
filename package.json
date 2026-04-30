@@ -2,6 +2,11 @@
   "name": "strudel-ai-visual-coder",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lux-02/Strudel.git"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -15,6 +20,7 @@
     "@strudel/draw": "latest",
     "@strudel/web": "latest",
     "@uiw/react-codemirror": "latest",
+    "heic2any": "^0.0.4",
     "lucide-react": "latest",
     "next": "latest",
     "openai": "^6.35.0",
