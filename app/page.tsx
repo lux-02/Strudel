@@ -1850,9 +1850,14 @@ export default function Home() {
             </button>
           </div>
 
-          <p className="license-note">
-            Strudel © contributors · AGPL-3.0-or-later
-          </p>
+          <div className="panel-footer">
+            <a className="service-link" href="https://strudel.n2f.site" target="_blank" rel="noreferrer">
+              strudel.n2f.site
+            </a>
+            <p className="license-note">
+              Strudel © contributors · AGPL-3.0-or-later
+            </p>
+          </div>
         </div>
 
         {settingsOpen ? (
