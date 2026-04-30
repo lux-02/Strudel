@@ -12,7 +12,9 @@ type GenerateRequest = {
   imageDataUrl?: string;
   imageName?: string;
   aiProvider?: "gpt" | "kanana";
+  openaiApiKey?: string;
   kananaApiKey?: string;
+  voiceTextureEnabled?: boolean;
   mode?: "generate" | "evolve" | "bridge";
   variantCount?: number;
   parents?: Array<{
@@ -60,6 +62,8 @@ type VoiceSynthesisProvider = "gpt" | "kanana";
 
 const allowedStyles: StyleKey[] = ["dream", "club", "cinematic", "glitch", "ambient"];
 const maxRequestBodyBytes = 2_500_000;
+const freeDailyGptGenerationLimit = 5;
+const freeGptUsageCookieName = "strudel-free-gpt-usage";
 const kananaBaseUrl = "https://kanana-o.a2s-endpoint.kr-central-2.kakaocloud.com/v1";
 const defaultShaderStyle = {
   foggy: 0.46,
@@ -70,6 +74,37 @@ const defaultShaderStyle = {
   scanline: 0.22,
 };
 type ShaderStyle = typeof defaultShaderStyle;
+
+function todayCookieKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function readCookieValue(request: Request, name: string) {
+  const cookies = request.headers.get("cookie")?.split(";") ?? [];
+  const prefix = `${name}=`;
+  const match = cookies.map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith(prefix));
+  return match ? decodeURIComponent(match.slice(prefix.length)) : "";
+}
+
+function readFreeGptUsage(request: Request) {
+  const today = todayCookieKey();
+  const [date, rawCount] = readCookieValue(request, freeGptUsageCookieName).split(":");
+  const count = date === today ? Math.max(0, Number(rawCount) || 0) : 0;
+
+  return { today, count };
+}
+
+function attachFreeGptUsageCookie(response: NextResponse, today: string, count: number) {
+  response.cookies.set(freeGptUsageCookieName, `${today}:${count}`, {
+    httpOnly: true,
+    maxAge: 60 * 60 * 36,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  return response;
+}
 
 function extractTracks(code: string): Track[] {
   const colors = ["#f5bd3d", "#17b6a4", "#ef5c5c", "#7c8cff", "#8ff7ff", "#cfffff"];
@@ -92,6 +127,7 @@ function buildUserPrompt({
   imageName,
   mode,
   variantCount,
+  voiceTextureEnabled,
   parents,
 }: {
   prompt: string;
@@ -100,6 +136,7 @@ function buildUserPrompt({
   imageName?: string;
   mode: "generate" | "evolve" | "bridge";
   variantCount: number;
+  voiceTextureEnabled: boolean;
   parents?: GenerateRequest["parents"];
 }) {
   const parentBlock = parents?.length
@@ -121,6 +158,7 @@ function buildUserPrompt({
 - Image name: ${imageName || "none"}
 - Mode: ${mode}
 - Variant count: ${variantCount}
+- Voice texture TTS enabled: ${voiceTextureEnabled ? "yes" : "no"}
 ${parentBlock}
 
 작업 순서:
@@ -134,9 +172,9 @@ ${parentBlock}
 8. 같은 응답의 모든 후보는 동일한 setcps, 동일한 style, 호환 가능한 scale/key, 유사한 $DRUMS backbone, 유사한 $BASS root motion을 유지한다.
 9. 후보 간 차이는 $MEL, $SYNTH, $LIGHT, $TEXTURE, 필터/룸/딜레이, shaderStyle 강도에서 만든다.
 10. 라이브 전환이 자연스럽도록 큰 변화는 $MEL, $SYNTH, $LIGHT, $TEXTURE 쪽에서 만들고 $DRUMS/$BASS는 안정적으로 유지한다.
-11. mode가 bridge가 아니면 모든 후보 코드에 $VOICE 트랙을 포함한다. $VOICE는 s("voice")를 begin/end/speed로 잘라 쓰는 낮은 gain의 vocal chop이어야 한다.
-12. voiceTexture는 같은 응답의 모든 후보가 공유하는 음성 재료다. 이미지에서 나온 단어 5-9개를 만들고 TTS가 읽기 쉬운 짧은 text로 압축한다.
-13. mode가 bridge이면 voiceTexture.enabled는 false로 두고 새 $VOICE 트랙을 만들지 않는다.
+11. Voice texture TTS가 enabled이고 mode가 bridge가 아니면 모든 후보 코드에 $VOICE 트랙을 포함한다. $VOICE는 s("voice")를 begin/end/speed로 잘라 쓰는 낮은 gain의 vocal chop이어야 한다.
+12. Voice texture TTS가 enabled이면 voiceTexture는 같은 응답의 모든 후보가 공유하는 음성 재료다. 이미지에서 나온 단어 5-9개를 만들고 TTS가 읽기 쉬운 짧은 text로 압축한다.
+13. Voice texture TTS가 disabled이거나 mode가 bridge이면 voiceTexture.enabled는 false로 두고 $VOICE 트랙을 만들지 않는다.
 14. 예시 코드나 기존 진행을 복제하지 않는다.
 
 반드시 {"voiceTexture": {...}, "variants":[...]} 형태의 JSON 객체만 반환한다. variants 길이는 ${variantCount}개여야 한다. Markdown 코드펜스나 설명 문장을 JSON 밖에 쓰지 않는다.`;
@@ -385,22 +423,24 @@ async function generateWithGpt({
   style,
   imageName,
   imageDataUrl,
+  apiKey,
   mode,
   variantCount,
+  voiceTextureEnabled,
   parents,
-}: Required<Pick<GenerateRequest, "prompt" | "bpm" | "style">> & Pick<GenerateRequest, "imageName" | "imageDataUrl" | "parents"> & { mode: "generate" | "evolve" | "bridge"; variantCount: number }) {
-  if (!process.env.OPENAI_API_KEY) {
+}: Required<Pick<GenerateRequest, "prompt" | "bpm" | "style">> & Pick<GenerateRequest, "imageName" | "imageDataUrl" | "parents"> & { apiKey: string; mode: "generate" | "evolve" | "bridge"; variantCount: number; voiceTextureEnabled: boolean }) {
+  if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI({ apiKey });
   const content: Array<
     | { type: "input_text"; text: string }
     | { type: "input_image"; image_url: string; detail: "original" }
   > = [
     {
       type: "input_text",
-      text: buildUserPrompt({ prompt, bpm, style, imageName, mode, variantCount, parents }),
+      text: buildUserPrompt({ prompt, bpm, style, imageName, mode, variantCount, voiceTextureEnabled, parents }),
     },
   ];
 
@@ -441,7 +481,7 @@ async function generateWithGpt({
                 text: { type: "string" },
                 words: {
                   type: "array",
-                  minItems: mode === "bridge" ? 0 : 5,
+                  minItems: mode === "bridge" || !voiceTextureEnabled ? 0 : 5,
                   maxItems: 9,
                   items: { type: "string" },
                 },
@@ -502,8 +542,9 @@ async function generateWithKanana({
   apiKey,
   mode,
   variantCount,
+  voiceTextureEnabled,
   parents,
-}: Required<Pick<GenerateRequest, "prompt" | "bpm" | "style">> & Pick<GenerateRequest, "imageName" | "imageDataUrl" | "parents"> & { apiKey: string; mode: "generate" | "evolve" | "bridge"; variantCount: number }) {
+}: Required<Pick<GenerateRequest, "prompt" | "bpm" | "style">> & Pick<GenerateRequest, "imageName" | "imageDataUrl" | "parents"> & { apiKey: string; mode: "generate" | "evolve" | "bridge"; variantCount: number; voiceTextureEnabled: boolean }) {
   const client = new OpenAI({
     baseURL: kananaBaseUrl,
     apiKey,
@@ -514,7 +555,7 @@ async function generateWithKanana({
   > = [
     {
       type: "text",
-      text: buildUserPrompt({ prompt, bpm, style, imageName, mode, variantCount, parents }),
+      text: buildUserPrompt({ prompt, bpm, style, imageName, mode, variantCount, voiceTextureEnabled, parents }),
     },
   ];
   const imageBase64 = stripDataUrlPrefix(imageDataUrl);
@@ -589,8 +630,12 @@ export async function POST(request: Request) {
   const provider = body.aiProvider === "kanana" ? "kanana" : "gpt";
   const mode = body.mode === "bridge" ? "bridge" : body.mode === "evolve" ? "evolve" : "generate";
   const variantCount = mode === "bridge" ? 1 : Math.max(1, Math.min(4, Math.round(Number(body.variantCount) || 4)));
+  const voiceTextureEnabled = mode !== "bridge" && body.voiceTextureEnabled === true;
   const parents = body.parents?.filter((parent) => parent.code?.trim()).slice(0, 4);
+  const openaiApiKey = body.openaiApiKey?.trim();
   const kananaApiKey = body.kananaApiKey?.trim() || process.env.KANANA_API_KEY?.trim();
+  const freeGptUsage = readFreeGptUsage(request);
+  let freeGptCountToPersist: number | undefined;
 
   try {
     let generated: GeneratedPatchResult | undefined;
@@ -611,6 +656,7 @@ export async function POST(request: Request) {
             apiKey: kananaApiKey,
             mode,
             variantCount,
+            voiceTextureEnabled,
             parents,
           });
           providerUsed = "kanana";
@@ -622,40 +668,61 @@ export async function POST(request: Request) {
     }
 
     if (!generated) {
+      const gptApiKey = openaiApiKey || process.env.OPENAI_API_KEY?.trim();
+      if (!openaiApiKey) {
+        if (freeGptUsage.count >= freeDailyGptGenerationLimit) {
+          return NextResponse.json({
+            error: "AI generation is busy.",
+            requiresApiKey: true,
+          }, { status: 429 });
+        }
+        freeGptCountToPersist = freeGptUsage.count + 1;
+      }
+
       generated = await generateWithGpt({
         prompt,
         bpm,
         style,
         imageName: body.imageName,
         imageDataUrl: body.imageDataUrl,
+        apiKey: gptApiKey ?? "",
         mode,
         variantCount,
+        voiceTextureEnabled,
         parents,
       });
     }
     const variants = generated.variants;
     const primary = variants[0];
-    const voiceTexture = mode === "bridge"
+    const voiceTexture = mode === "bridge" || !voiceTextureEnabled
       ? undefined
       : await synthesizeVoiceTexture(generated.voiceTexture, {
         provider: providerUsed,
         kananaApiKey,
       });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ...primary,
       variants,
       voiceTexture,
       provider: providerUsed,
       providerFallback,
     });
+
+    return freeGptCountToPersist === undefined
+      ? response
+      : attachFreeGptUsageCookie(response, freeGptUsage.today, freeGptCountToPersist);
   } catch (error) {
     console.error(error);
     const variants = fallbackVariants({ prompt, bpm, style, imageName: body.imageName, variantCount });
-    return NextResponse.json({
+    const response = NextResponse.json({
       error: "AI failed to generate Strudel code",
       fallback: variants[0],
       variants,
     }, { status: 502 });
+
+    return freeGptCountToPersist === undefined
+      ? response
+      : attachFreeGptUsageCookie(response, freeGptUsage.today, freeGptCountToPersist);
   }
 }

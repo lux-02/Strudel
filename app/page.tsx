@@ -890,7 +890,9 @@ export default function Home() {
   const [status, setStatus] = useState("Ready");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aiProvider, setAiProvider] = useState<AIProvider>("gpt");
+  const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [kananaApiKey, setKananaApiKey] = useState("");
+  const [voiceTextureEnabled, setVoiceTextureEnabled] = useState(false);
   const [shaderStyle, setShaderStyle] = useState<ShaderStyle>(defaultShaderStyle);
   const [variants, setVariants] = useState<GeneratedAIVariant[]>([]);
   const [activeVariantId, setActiveVariantId] = useState("");
@@ -1122,13 +1124,21 @@ export default function Home() {
 
   useEffect(() => {
     const savedProvider = window.localStorage.getItem("strudel-ai-provider");
+    const savedOpenAIKey = window.localStorage.getItem("strudel-openai-api-key");
     const savedKananaKey = window.localStorage.getItem("strudel-kanana-api-key");
+    const savedVoiceTextureEnabled = window.localStorage.getItem("strudel-voice-texture-enabled");
 
     if (savedProvider === "gpt" || savedProvider === "kanana") {
       setAiProvider(savedProvider);
     }
+    if (savedOpenAIKey) {
+      setOpenaiApiKey(savedOpenAIKey);
+    }
     if (savedKananaKey) {
       setKananaApiKey(savedKananaKey);
+    }
+    if (savedVoiceTextureEnabled === "true") {
+      setVoiceTextureEnabled(true);
     }
   }, []);
 
@@ -1137,12 +1147,24 @@ export default function Home() {
   }, [aiProvider]);
 
   useEffect(() => {
+    if (openaiApiKey.trim()) {
+      window.localStorage.setItem("strudel-openai-api-key", openaiApiKey.trim());
+    } else {
+      window.localStorage.removeItem("strudel-openai-api-key");
+    }
+  }, [openaiApiKey]);
+
+  useEffect(() => {
     if (kananaApiKey.trim()) {
       window.localStorage.setItem("strudel-kanana-api-key", kananaApiKey.trim());
     } else {
       window.localStorage.removeItem("strudel-kanana-api-key");
     }
   }, [kananaApiKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem("strudel-voice-texture-enabled", String(voiceTextureEnabled));
+  }, [voiceTextureEnabled]);
 
   useEffect(() => {
     if (isPlaying && settingsOpen) {
@@ -1323,7 +1345,9 @@ export default function Home() {
         imageName,
         imageDataUrl,
         aiProvider,
+        openaiApiKey: openaiApiKey.trim(),
         kananaApiKey: aiProvider === "kanana" ? kananaApiKey.trim() : "",
+        voiceTextureEnabled,
         mode: "bridge",
         variantCount: 1,
         parents: [sourceVariant, targetVariant],
@@ -1347,7 +1371,7 @@ export default function Home() {
       label: "Bridge",
       title: `Bridge to ${targetVariant.label ?? "variant"}`,
     };
-  }, [activeVariantId, aiProvider, bpm, composition.code, composition.title, composition.tracks, imageDataUrl, imageName, kananaApiKey, prompt, shaderStyle, style]);
+  }, [activeVariantId, aiProvider, bpm, composition.code, composition.title, composition.tracks, imageDataUrl, imageName, kananaApiKey, openaiApiKey, prompt, shaderStyle, style, voiceTextureEnabled]);
 
   const scheduleVariantSequence = useCallback((targetVariant: GeneratedAIVariant, bridgeVariant?: GeneratedAIVariant) => {
     if (variantSwitchTimerRef.current !== null) {
@@ -1498,7 +1522,9 @@ export default function Home() {
           imageName,
           imageDataUrl,
           aiProvider,
+          openaiApiKey: openaiApiKey.trim(),
           kananaApiKey: aiProvider === "kanana" ? kananaApiKey.trim() : "",
+          voiceTextureEnabled,
           mode,
           variantCount: 4,
           parents,
@@ -1510,6 +1536,7 @@ export default function Home() {
         : { error: (await response.text()) || `Request failed with ${response.status}` }) as Partial<GeneratedAIComposition> & {
         error?: string;
         fallback?: GeneratedComposition;
+        requiresApiKey?: boolean;
       };
       const normalizedVariants = (result.variants ?? [])
         .map((variant, index) => normalizeVariant(variant, index, composition.tracks))
@@ -1534,7 +1561,12 @@ export default function Home() {
             applyVariant(fallbackVariant, true);
           }
         }
-        setStatus(response.status === 413 ? "Image is too large for generation" : (result.error ?? "AI generation failed"));
+        if (response.status === 429 && result.requiresApiKey) {
+          setStatus("AI generation is busy. Add your OpenAI API key in Settings.");
+          setSettingsOpen(true);
+        } else {
+          setStatus(response.status === 413 ? "Image is too large for generation" : (result.error ?? "AI generation failed"));
+        }
         return;
       }
 
@@ -1572,7 +1604,7 @@ export default function Home() {
     } finally {
       setIsGenerating(false);
     }
-  }, [aiProvider, applyVariant, bpm, composition.code, composition.title, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, patchReady, prompt, registerVoiceTexture, resetPlaybackForPatchChange, shaderStyle, style, unlockAudioEngine, variants]);
+  }, [aiProvider, applyVariant, bpm, composition.code, composition.title, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, openaiApiKey, patchReady, prompt, registerVoiceTexture, resetPlaybackForPatchChange, shaderStyle, style, unlockAudioEngine, variants, voiceTextureEnabled]);
 
   const generate = useCallback(async () => {
     await requestVariants("generate");
@@ -1996,6 +2028,19 @@ export default function Home() {
                 </label>
               </div>
 
+              {aiProvider === "gpt" ? (
+                <label className="settings-field">
+                  <span>OpenAI API Key</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={openaiApiKey}
+                    onChange={(event) => setOpenaiApiKey(event.target.value)}
+                    placeholder="sk-..."
+                  />
+                </label>
+              ) : null}
+
               {aiProvider === "kanana" ? (
                 <label className="settings-field">
                   <span>Kanana API Key</span>
@@ -2008,6 +2053,18 @@ export default function Home() {
                   />
                 </label>
               ) : null}
+
+              <label className="settings-toggle">
+                <span>
+                  <strong>Voice Texture TTS</strong>
+                  <em>Generate vocal chop audio with the selected provider.</em>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={voiceTextureEnabled}
+                  onChange={(event) => setVoiceTextureEnabled(event.target.checked)}
+                />
+              </label>
 
               <div className="shader-settings">
                 <div className="settings-subhead">
