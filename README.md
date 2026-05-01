@@ -50,6 +50,16 @@ Strudel AI Visual Coder는 이미지를 입력값으로 삼아 사운드, 코드
 - **무료 생성 한도**: 비로그인 사용자는 브라우저 쿠키 기준 하루 5회까지 서버 GPT 키로 생성할 수 있고, 이후에는 개인 API Key 입력이 필요합니다.
 - **HEIC/HEIF 지원**: iPhone 이미지는 브라우저에서 JPEG로 변환한 뒤 분석합니다.
 
+### 왜 Kanana를 넣었나요?
+
+Strudel AI Visual Coder는 단순한 음악 생성 도구가 아니라, 이미지를 사운드로 번역하는 실험입니다. 이 과정에서 모델은 코드를 생성하기 전에 이미지의 색, 질감, 움직임, 감정, 구도를 먼저 읽고, 그 해석을 리듬, 템포, 악기, 트랙 구조로 연결해야 합니다.
+
+Kanana는 이 흐름에서 한국어 기반의 창작 해석 레이어로 작동할 수 있기 때문에 추가했습니다. 테스트에서 GPT는 빠르고 안정적인 생성 엔진에 가까웠고, Kanana는 이미지를 한국어 감각으로 더 직접적으로 설명한 뒤 이를 사운드 기획 문장으로 연결하는 강점을 보였습니다.
+
+예를 들어 Kanana는 횡단보도 위를 달리는 인물의 반복적인 스트라이드, 도시적 박동, 이중 프레임의 움직임을 읽고, 이를 124 BPM 클럽 펄스, A minor 베이스, 909 드럼, 차가운 saw/triangle 신스 질감으로 매핑했습니다.
+
+따라서 Kanana는 단순히 "또 다른 모델 옵션"이 아니라, 이미지가 왜 이런 소리가 되었는지 설명하는 로컬 감각의 창작 레이어로 의미가 있습니다.
+
 ### 최근 업그레이드
 
 - **체계적인 Sound Pack 선택**: 이미지 분석 결과에 따라 기본 샘플, 808, 909 계열 사운드 팩을 선택하고, 선택된 drum bank가 실제 Strudel 코드에 반영되도록 서버에서 보정합니다.
@@ -284,6 +294,16 @@ The interface is built for visual music capture: generated code, piano rolls, wa
 - **GPT / Kanana provider selection**: Defaults to OpenAI GPT. When Kanana is selected, Kanana drafts the local/image interpretation and GPT compiles it into executable Strudel. After the free GPT quota is used, users can add their own OpenAI API key in Settings.
 - **Free generation quota**: Anonymous users can generate up to 5 times per day with the server GPT key, tracked by a browser cookie.
 - **HEIC/HEIF support**: Converts iPhone images to JPEG in the browser before analysis.
+
+### Why Kanana?
+
+Strudel AI Visual Coder is not only a music generation tool. It is an experiment in translating visual perception into sound. Before the app can produce useful Strudel code, the model needs to read color, texture, motion, emotion, and composition, then turn that interpretation into rhythm, tempo, instruments, and track structure.
+
+Kanana was added as a Korean-native creative interpretation layer in this workflow. In testing, GPT worked well as a fast and stable generation engine. Kanana showed a different strength: it described visual scenes in more direct Korean creative language, then connected that interpretation to sound-design decisions.
+
+For example, Kanana interpreted a running figure over a crosswalk as repeated stride, urban pulse, and double-frame motion, then mapped it into a 124 BPM club pulse, A minor bass movement, 909 drums, and cold saw/triangle synth textures.
+
+This makes Kanana useful not just as another provider, but as a local-language creative layer for explaining why an image becomes a particular sound.
 
 ### Quick Start
 
