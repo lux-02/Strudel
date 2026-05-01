@@ -10,6 +10,7 @@ coverage/
 .omx/
 *.png
 !public/readme-preview.png
+!public/og-image.png
 .vercel
 
 # local browser/test artifacts

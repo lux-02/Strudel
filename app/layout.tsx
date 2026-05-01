@@ -4,6 +4,7 @@ import "./globals.css";
 const siteUrl = "https://strudel.n2f.site";
 const title = "Strudel AI Visual Coder | Image-to-Strudel Visual Music App";
 const description = "Upload an image and generate executable Strudel music code, track-level pianorolls, waveforms, AI-selected sound packs, vocal chops, and audio-reactive shader visuals.";
+const previewImage = "/og-image.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -46,9 +47,11 @@ export const metadata: Metadata = {
     description,
     images: [
       {
-        url: "/readme-preview.png",
-        width: 1600,
-        height: 1000,
+        url: previewImage,
+        secureUrl: `${siteUrl}${previewImage}`,
+        width: 1200,
+        height: 630,
+        type: "image/png",
         alt: "Strudel AI Visual Coder interface with image input, generated Strudel code, track widgets, and shader visuals.",
       },
     ],
@@ -57,7 +60,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title,
     description,
-    images: ["/readme-preview.png"],
+    images: [previewImage],
   },
   robots: {
     index: true,
@@ -95,7 +98,7 @@ const structuredData = {
       operatingSystem: "Desktop web browser",
       browserRequirements: "Requires WebGL, Web Audio API, and a desktop browser.",
       description,
-      image: `${siteUrl}/readme-preview.png`,
+      image: `${siteUrl}${previewImage}`,
       creator: {
         "@type": "Person",
         name: "lux-02",
