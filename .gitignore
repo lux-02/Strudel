@@ -12,6 +12,11 @@ coverage/
 !public/readme-preview.png
 .vercel
 
+# local browser/test artifacts
+.playwright-mcp/
+playwright-report/
+test-results/
+
 # local report/demo artifacts
 app/report-demo/
 public/report-demo/

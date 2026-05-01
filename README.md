@@ -55,6 +55,7 @@ Strudel AI Visual Coder는 이미지를 입력값으로 삼아 사운드, 코드
 - **체계적인 Sound Pack 선택**: 이미지 분석 결과에 따라 기본 샘플, 808, 909 계열 사운드 팩을 선택하고, 선택된 drum bank가 실제 Strudel 코드에 반영되도록 서버에서 보정합니다.
 - **Shader Mode Material 분리**: `Filament`, `Plasma`, `Spectral`, `Scanline`이 흰색 빛 위의 효과가 아니라 각각 선, 덩어리, 입자, 신호 손상을 주재료로 렌더링되도록 분리했습니다.
 - **Image Analysis Modal**: 작은 debug panel은 말줄임표로 유지하고, 클릭 시 색/질감/움직임/감정/구도/soundPack/음악 매핑 전체 내용을 모달로 확인할 수 있습니다.
+- **SEO/GEO 표면 정리**: canonical metadata, Open Graph/Twitter card, JSON-LD, sitemap, robots, manifest, `llms.txt`를 추가해 검색엔진과 AI 요약 시스템이 서비스의 목적을 더 정확히 읽을 수 있게 했습니다.
 - **Auto Loop 퍼포먼스 모드**: A/B/C/D 변주를 4/8/16마디 단위로 자동 순환시키며, 각 전환은 기존 AI bridge와 4마디 crossfade를 사용합니다.
 - **전환 카운트다운**: Auto Loop 재생 중 다음 변주까지 남은 마디와 시간을 표시해 캡처/라이브 퍼포먼스 흐름을 읽기 쉽게 했습니다.
 - **짧아진 큐 전환**: 큐 대기는 다음 마디 기준으로 정렬하고, bridge/crossfade 기본 길이는 4마디로 조정했습니다.
@@ -132,6 +133,10 @@ app/
   api/generate-strudel/route.ts  # 이미지 분석 및 Strudel 코드 생성 API
   globals.css                    # UI, CodeMirror, shader/layout 스타일
   page.tsx                       # 메인 앱, Strudel 런타임, 위젯, shader, variant 전환
+  layout.tsx                     # SEO/GEO metadata and JSON-LD
+  manifest.ts                    # Web app manifest
+  robots.ts                      # Search crawler rules
+  sitemap.ts                     # Public sitemap
 
 lib/
   code-highlight.ts              # CodeMirror active range decoration
@@ -141,6 +146,10 @@ lib/
 
 types/
   *.d.ts                         # 타입 보강
+
+public/
+  llms.txt                       # AI assistant/GEO summary surface
+  readme-preview.png             # README and Open Graph preview image
 ```
 
 ### Tech Stack

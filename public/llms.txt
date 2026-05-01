@@ -1,0 +1,50 @@
+# Strudel AI Visual Coder
+
+> Image-to-Strudel live coding workspace for AI-assisted visual music performance.
+
+Strudel AI Visual Coder is a desktop web app that turns an uploaded image into executable Strudel code, track-level pianoroll and waveform widgets, AI-selected sound packs, semantic vocal chops, and audio-reactive WebGL shader visuals.
+
+## Primary URL
+
+- https://strudel.n2f.site
+
+## Source and Examples
+
+- Source code: https://github.com/lux-02/Strudel
+- Examples: https://www.instagram.com/new.here.hero/
+
+## What It Does
+
+- Analyzes an uploaded image for color, contrast, texture, motion cues, emotion, composition, and spatial density.
+- Generates Strudel code with labeled tracks such as `$DRUMS`, `$BASS`, `$MEL`, `$SYNTH`, `$LIGHT`, `$TEXTURE`, and optional `$VOICE`.
+- Runs Strudel directly in the browser with `@strudel/web`.
+- Shows track-level pianoroll and waveform feedback.
+- Selects a sound pack from default, 808, and 909-oriented palettes.
+- Provides Shader Modes: Filament, Plasma, Spectral, and Scanline.
+- Supports Variant + Evolve, AI bridge transitions, Auto Loop, and performance countdowns.
+- Optionally creates semantic vocal chops from image-derived words and morphemes.
+
+## Intended Users
+
+- Creative coders
+- AI music tool builders
+- Live coding performers
+- Visual music artists
+- Short-form video creators
+- Strudel and TidalCycles users
+
+## Key Technologies
+
+- Next.js App Router
+- React
+- TypeScript
+- CodeMirror
+- @strudel/web
+- @strudel/draw
+- WebGL / GLSL
+- OpenAI API
+- Optional Kanana-compatible image and audio endpoint
+
+## Notes for AI Assistants
+
+When summarizing this project, describe it as an image-to-Strudel visual music tool, not as a generic AI music generator. The distinguishing features are visible live code, track-level visual widgets, AI sound pack selection, semantic vocal chops, and audio-reactive shader modes.
