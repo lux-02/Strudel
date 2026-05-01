@@ -23,6 +23,7 @@ type GenerateRequest = {
     style?: StyleKey;
     analysis?: string;
     shaderStyle?: Partial<ShaderStyle>;
+    soundPack?: Partial<SoundPack>;
     code?: string;
   }>;
 };
@@ -33,8 +34,22 @@ type StrudelAIVariant = {
   style: StyleKey;
   analysis: string;
   shaderStyle?: ShaderStyle;
+  soundPack?: SoundPack;
   code: string;
   tracks: string[];
+};
+
+type SoundPack = {
+  id: "default-dry" | "analog-808" | "club-909" | "cinematic-808" | "glitch-909";
+  name: string;
+  drumBank: "default" | "RolandTR808" | "RolandTR909";
+  character: "dry" | "warm" | "punchy" | "wide" | "glitch";
+  kick: "bd";
+  snare: "sd" | "cp";
+  hat: "hh";
+  openHat: "oh";
+  texture: "misc" | "white" | "voice" | "noise";
+  rationale: string;
 };
 
 type VoiceTexture = {
@@ -49,12 +64,14 @@ type VoiceTexture = {
 };
 
 type StrudelAIResponse = StrudelAIVariant | {
+  soundPack: SoundPack;
   variants: StrudelAIVariant[];
   voiceTexture?: VoiceTexture;
 };
 
 type GeneratedPatchResult = {
   variants: Awaited<ReturnType<typeof parseGeneratedVariant>>[];
+  soundPack: SoundPack;
   voiceTexture?: VoiceTexture;
 };
 
@@ -79,6 +96,67 @@ const defaultShaderStyle = {
   scanline: 0.22,
 };
 type ShaderStyle = typeof defaultShaderStyle;
+const soundPackCatalog: Record<SoundPack["id"], Omit<SoundPack, "rationale">> = {
+  "default-dry": {
+    id: "default-dry",
+    name: "Default Dry Kit",
+    drumBank: "default",
+    character: "dry",
+    kick: "bd",
+    snare: "sd",
+    hat: "hh",
+    openHat: "oh",
+    texture: "misc",
+  },
+  "analog-808": {
+    id: "analog-808",
+    name: "Analog 808 Warmth",
+    drumBank: "RolandTR808",
+    character: "warm",
+    kick: "bd",
+    snare: "sd",
+    hat: "hh",
+    openHat: "oh",
+    texture: "white",
+  },
+  "club-909": {
+    id: "club-909",
+    name: "Club 909 Punch",
+    drumBank: "RolandTR909",
+    character: "punchy",
+    kick: "bd",
+    snare: "cp",
+    hat: "hh",
+    openHat: "oh",
+    texture: "white",
+  },
+  "cinematic-808": {
+    id: "cinematic-808",
+    name: "Cinematic 808 Space",
+    drumBank: "RolandTR808",
+    character: "wide",
+    kick: "bd",
+    snare: "sd",
+    hat: "hh",
+    openHat: "oh",
+    texture: "voice",
+  },
+  "glitch-909": {
+    id: "glitch-909",
+    name: "Glitch 909 Shards",
+    drumBank: "RolandTR909",
+    character: "glitch",
+    kick: "bd",
+    snare: "cp",
+    hat: "hh",
+    openHat: "oh",
+    texture: "noise",
+  },
+};
+const defaultSoundPack: SoundPack = {
+  ...soundPackCatalog["default-dry"],
+  rationale: "Fallback dry default pack for broad browser compatibility.",
+};
 
 function getOpenAIModel() {
   return process.env.OPENAI_MODEL?.trim() || defaultOpenAIModel;
@@ -162,6 +240,7 @@ function buildUserPrompt({
 - Style: ${parent.style ?? "unknown"}
 - Analysis: ${parent.analysis ?? "none"}
 - ShaderStyle: ${JSON.stringify(normalizeShaderStyle(parent.shaderStyle))}
+- SoundPack: ${JSON.stringify(normalizeSoundPack(parent.soundPack))}
 - Code:\n${parent.code ?? ""}`).join("\n\n")}`
     : "";
 
@@ -181,19 +260,21 @@ ${parentBlock}
 1. 이미지가 있으면 이미지의 색, 조명, 질감, 구도, 에너지, 감정을 분석한다.
 2. 분석 결과에 맞는 BPM을 60-190 사이에서 직접 선택한다.
 3. 분석 결과에 맞는 style을 dream, club, cinematic, glitch, ambient 중 하나로 직접 선택한다.
-4. 먼저 하나의 performance DNA를 정한다: bpm, style, scale/key, drumBackbone, bassRootMotion, soundPalette.
-5. mode가 generate이면 서로 다른 곡 후보가 아니라 같은 performance DNA 안에서 즉시 믹스 가능한 후보 ${variantCount}개를 만든다.
-6. mode가 evolve이면 부모 패치의 performance DNA를 유지하면서 offspring ${variantCount}개를 만든다. 장르, BPM, scale/key를 바꾸지 않는다.
-7. mode가 bridge이면 Parent 1에서 Parent 2로 넘어가는 전환용 패치 1개만 만든다. Parent 1의 $DRUMS 그루브를 유지하고, Parent 2의 코드/스케일/화성 중심으로 filter가 상승하는 느낌을 만들며, $MEL은 Parent 1의 음형에서 Parent 2의 음형으로 변형되는 중간 형태여야 한다. shaderStyle은 Parent 2에 70-85% 가까운 값으로 만든다.
-8. 같은 응답의 모든 후보는 동일한 setcps, 동일한 style, 호환 가능한 scale/key, 유사한 $DRUMS backbone, 유사한 $BASS root motion을 유지한다.
-9. 후보 간 차이는 $MEL, $SYNTH, $LIGHT, $TEXTURE, 필터/룸/딜레이, shaderStyle 강도에서 만든다.
-10. 라이브 전환이 자연스럽도록 큰 변화는 $MEL, $SYNTH, $LIGHT, $TEXTURE 쪽에서 만들고 $DRUMS/$BASS는 안정적으로 유지한다.
-11. Voice texture TTS가 enabled이고 mode가 bridge가 아니면 모든 후보 코드에 $VOICE 트랙을 포함한다. $VOICE는 s("voice")를 begin/end/speed로 잘라 쓰는 낮은 gain의 vocal chop이어야 한다.
-12. Voice texture TTS가 enabled이면 voiceTexture는 같은 응답의 모든 후보가 공유하는 음성 재료다. 이미지에서 나온 단어 5-9개를 만들고 TTS가 읽기 쉬운 짧은 text로 압축한다.
-13. Voice texture TTS가 disabled이거나 mode가 bridge이면 voiceTexture.enabled는 false로 두고 $VOICE 트랙을 만들지 않는다.
-14. 예시 코드나 기존 진행을 복제하지 않는다.
+4. 먼저 하나의 performance DNA를 정한다: bpm, style, scale/key, drumBackbone, bassRootMotion, soundPalette, soundPack.
+5. 이미지 근거에 맞춰 soundPack을 default-dry, analog-808, club-909, cinematic-808, glitch-909 중 하나로 선택한다.
+6. 선택한 soundPack.drumBank가 RolandTR808 또는 RolandTR909이면 $DRUMS의 bd/sd/cp/hh/oh 샘플에 .bank("선택한 bank")를 붙여 코드에 실제 반영한다. default이면 bank를 붙이지 않는다.
+7. mode가 generate이면 서로 다른 곡 후보가 아니라 같은 performance DNA 안에서 즉시 믹스 가능한 후보 ${variantCount}개를 만든다.
+8. mode가 evolve이면 부모 패치의 performance DNA와 soundPack 성격을 유지하면서 offspring ${variantCount}개를 만든다. 장르, BPM, scale/key를 바꾸지 않는다.
+9. mode가 bridge이면 Parent 1에서 Parent 2로 넘어가는 전환용 패치 1개만 만든다. Parent 1의 $DRUMS 그루브와 soundPack 성격을 유지하고, Parent 2의 코드/스케일/화성 중심으로 filter가 상승하는 느낌을 만들며, $MEL은 Parent 1의 음형에서 Parent 2의 음형으로 변형되는 중간 형태여야 한다. shaderStyle은 Parent 2에 70-85% 가까운 값으로 만든다.
+10. 같은 응답의 모든 후보는 동일한 setcps, 동일한 style, 동일한 soundPack, 호환 가능한 scale/key, 유사한 $DRUMS backbone, 유사한 $BASS root motion을 유지한다.
+11. 후보 간 차이는 $MEL, $SYNTH, $LIGHT, $TEXTURE, 필터/룸/딜레이, shaderStyle 강도에서 만든다.
+12. 라이브 전환이 자연스럽도록 큰 변화는 $MEL, $SYNTH, $LIGHT, $TEXTURE 쪽에서 만들고 $DRUMS/$BASS는 안정적으로 유지한다.
+13. Voice texture TTS가 enabled이고 mode가 bridge가 아니면 모든 후보 코드에 $VOICE 트랙을 포함한다. $VOICE는 s("voice")를 begin/end/speed로 잘라 쓰는 낮은 gain의 vocal chop이어야 한다.
+14. Voice texture TTS가 enabled이면 voiceTexture는 같은 응답의 모든 후보가 공유하는 음성 재료다. 이미지에서 나온 단어 5-9개를 만들고 TTS가 읽기 쉬운 짧은 text로 압축한다.
+15. Voice texture TTS가 disabled이거나 mode가 bridge이면 voiceTexture.enabled는 false로 두고 $VOICE 트랙을 만들지 않는다.
+16. 예시 코드나 기존 진행을 복제하지 않는다.
 
-반드시 {"voiceTexture": {...}, "variants":[...]} 형태의 JSON 객체만 반환한다. variants 길이는 ${variantCount}개여야 한다. Markdown 코드펜스나 설명 문장을 JSON 밖에 쓰지 않는다.`;
+반드시 {"soundPack": {...}, "voiceTexture": {...}, "variants":[...]} 형태의 JSON 객체만 반환한다. variants 길이는 ${variantCount}개여야 한다. Markdown 코드펜스나 설명 문장을 JSON 밖에 쓰지 않는다.`;
 }
 
 function normalizeShaderStyle(shaderStyle?: Partial<ShaderStyle>): ShaderStyle {
@@ -203,6 +284,31 @@ function normalizeShaderStyle(shaderStyle?: Partial<ShaderStyle>): ShaderStyle {
       return [key, Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback];
     }),
   ) as ShaderStyle;
+}
+
+function normalizeSoundPack(soundPack?: Partial<SoundPack>): SoundPack {
+  const id = Object.prototype.hasOwnProperty.call(soundPackCatalog, soundPack?.id ?? "")
+    ? soundPack?.id as SoundPack["id"]
+    : defaultSoundPack.id;
+  const catalogPack = soundPackCatalog[id];
+  const rationale = String(soundPack?.rationale ?? "").trim().slice(0, 180);
+
+  return {
+    ...catalogPack,
+    rationale: rationale || defaultSoundPack.rationale,
+  };
+}
+
+function applySoundPackToCode(code: string, soundPack: SoundPack) {
+  if (soundPack.drumBank === "default") return code;
+  if (code.includes(`.bank("${soundPack.drumBank}")`) || code.includes(`.bank('${soundPack.drumBank}')`)) return code;
+
+  const drumTokenPattern = /(^|[\s[\]<>,])(?:bd|sd|cp|hh|oh|rim)(?:$|[\s\]*<>,])/i;
+
+  return code.replace(/s\(\s*(["'])([^"']+)\1\s*\)(?!\s*\.bank\s*\()/g, (match, quote: string, samplePattern: string) => {
+    if (!drumTokenPattern.test(samplePattern)) return match;
+    return `s(${quote}${samplePattern}${quote}).bank("${soundPack.drumBank}")`;
+  });
 }
 
 async function assertValidStrudelSyntax(code: string) {
@@ -220,7 +326,8 @@ async function assertValidStrudelSyntax(code: string) {
 }
 
 async function parseGeneratedVariant(generated: StrudelAIVariant, fallbackBpm: number, fallbackStyle: StyleKey) {
-  const code = normalizeStrudelCode(stripCodeFence(generated.code));
+  const soundPack = normalizeSoundPack(generated.soundPack);
+  const code = normalizeStrudelCode(applySoundPackToCode(stripCodeFence(generated.code), soundPack));
 
   if (!code.includes("setcps") || !code.includes("$BASS:")) {
     throw new Error("Model response did not look like a complete Strudel patch");
@@ -233,6 +340,7 @@ async function parseGeneratedVariant(generated: StrudelAIVariant, fallbackBpm: n
     style: allowedStyles.includes(generated.style) ? generated.style : fallbackStyle,
     analysis: generated.analysis,
     shaderStyle: normalizeShaderStyle(generated.shaderStyle),
+    soundPack,
     code,
     tracks: extractTracks(code || generated.tracks.join("\n")),
   };
@@ -242,10 +350,11 @@ async function parseGeneratedPatch(output: string, fallbackBpm: number, fallback
   const jsonText = stripCodeFence(output).replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
   const generated = JSON.parse(jsonText) as StrudelAIResponse;
   const rawVariants = "variants" in generated ? generated.variants : [generated];
+  const soundPack = normalizeSoundPack("variants" in generated ? generated.soundPack : generated.soundPack);
   const variants = await Promise.all(
     rawVariants
       .slice(0, variantCount)
-      .map((variant) => parseGeneratedVariant(variant, fallbackBpm, fallbackStyle)),
+      .map((variant) => parseGeneratedVariant({ ...variant, soundPack: variant.soundPack ?? soundPack }, fallbackBpm, fallbackStyle)),
   );
 
   if (!variants.length) {
@@ -258,8 +367,10 @@ async function parseGeneratedPatch(output: string, fallbackBpm: number, fallback
       ...variant,
       bpm: anchor.bpm,
       style: anchor.style,
+      soundPack,
       code: variant.code.replace(/setcps\s*\(\s*[^)]+\s*\)/i, `setcps(${anchor.bpm}/60/4)`),
     })),
+    soundPack,
     voiceTexture: "variants" in generated ? normalizeVoiceTexture(generated.voiceTexture) : undefined,
   };
 }
@@ -300,8 +411,25 @@ function buildStrudelPatchJsonSchema({
   return {
     type: "object",
     additionalProperties: false,
-    required: ["variants", "voiceTexture"],
+    required: ["soundPack", "variants", "voiceTexture"],
     properties: {
+      soundPack: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "name", "drumBank", "character", "kick", "snare", "hat", "openHat", "texture", "rationale"],
+        properties: {
+          id: { type: "string", enum: Object.keys(soundPackCatalog) },
+          name: { type: "string" },
+          drumBank: { type: "string", enum: ["default", "RolandTR808", "RolandTR909"] },
+          character: { type: "string", enum: ["dry", "warm", "punchy", "wide", "glitch"] },
+          kick: { type: "string", enum: ["bd"] },
+          snare: { type: "string", enum: ["sd", "cp"] },
+          hat: { type: "string", enum: ["hh"] },
+          openHat: { type: "string", enum: ["oh"] },
+          texture: { type: "string", enum: ["misc", "white", "voice", "noise"] },
+          rationale: { type: "string" },
+        },
+      },
       voiceTexture: {
         type: "object",
         additionalProperties: false,
@@ -503,6 +631,24 @@ function stripDataUrlPrefix(dataUrl?: string) {
   return dataUrl?.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "") ?? "";
 }
 
+function inferFallbackSoundPack(prompt: string, style: StyleKey, imageName?: string): SoundPack {
+  const input = `${prompt} ${style} ${imageName ?? ""}`.toLowerCase();
+  const id: SoundPack["id"] = /glitch|noise|broken|metal|cyber|digital|깨|노이즈|금속|사이버/.test(input)
+    ? "glitch-909"
+    : /club|dance|rave|flash|city|night|drive|클럽|댄스|도시|밤/.test(input)
+      ? "club-909"
+      : /cinema|wide|fog|mist|water|landscape|영화|안개|풍경|수면/.test(input)
+        ? "cinematic-808"
+        : /warm|sunset|retro|skin|orange|노을|레트로|따뜻/.test(input)
+          ? "analog-808"
+          : "default-dry";
+
+  return {
+    ...soundPackCatalog[id],
+    rationale: "Selected by local fallback from prompt/style cues.",
+  };
+}
+
 async function generateWithGpt({
   prompt,
   bpm,
@@ -574,6 +720,7 @@ function buildKananaDraftPrompt({
 - BPM: ${parent.bpm ?? "unknown"}
 - Style: ${parent.style ?? "unknown"}
 - Analysis: ${parent.analysis ?? "none"}
+- SoundPack: ${JSON.stringify(normalizeSoundPack(parent.soundPack))}
 - Code summary: ${(parent.code ?? "").slice(0, 1200)}`).join("\n\n")}`
     : "";
 
@@ -583,6 +730,7 @@ function buildKananaDraftPrompt({
     "Write a concise creative draft that GPT will compile into strict executable Strudel later.",
     "",
     "Focus on Korean/local language sensitivity, movement, rhythm, image mood, voice texture words, and sound palette.",
+    "Choose one sound pack from default-dry, analog-808, club-909, cinematic-808, glitch-909 and explain why it matches the image.",
     "",
     `Prompt: ${prompt}`,
     `Image name: ${imageName || "none"}`,
@@ -596,9 +744,10 @@ function buildKananaDraftPrompt({
     "Return these sections in plain text:",
     "1. Image reading: 3-5 short bullets.",
     "2. Performance DNA: bpm, style, key/scale, drum backbone, bass motion, density.",
-    "3. Track intentions: BASS, DRUMS, MEL, SYNTH, optional LIGHT/TEXTURE, optional VOICE.",
-    "4. Voice texture words: 5-9 short words or syllables, comma-separated.",
-    "5. Variant directions: one short line per requested variant.",
+    "3. Sound pack: chosen id, drum bank, character, and image-based rationale.",
+    "4. Track intentions: BASS, DRUMS, MEL, SYNTH, optional LIGHT/TEXTURE, optional VOICE.",
+    "5. Voice texture words: 5-9 short words or syllables, comma-separated.",
+    "6. Variant directions: one short line per requested variant.",
     "",
     "Keep the whole draft under 900 words.",
   ].filter(Boolean).join("\n");
@@ -781,6 +930,8 @@ async function generateWithKanana({
 }
 
 function fallbackVariants({ prompt, bpm, style, imageName, variantCount }: { prompt: string; bpm: number; style: StyleKey; imageName?: string; variantCount: number }) {
+  const soundPack = inferFallbackSoundPack(prompt, style, imageName);
+
   return Array.from({ length: variantCount }, (_, index) => {
     const patch = generateComposition({
       prompt: `${prompt} variant ${index + 1}`,
@@ -794,6 +945,7 @@ function fallbackVariants({ prompt, bpm, style, imageName, variantCount }: { pro
       bpm,
       style,
       analysis: "Fallback generated from local Strudel presets.",
+      soundPack,
       shaderStyle: normalizeShaderStyle({
         foggy: defaultShaderStyle.foggy + index * 0.04,
         glitch: defaultShaderStyle.glitch + index * 0.03,
@@ -900,6 +1052,7 @@ export async function POST(request: Request) {
     }
     const variants = generated.variants;
     const primary = variants[0];
+    const soundPack = generated.soundPack;
     const voiceTexture = mode === "bridge" || !voiceTextureEnabled
       ? undefined
       : await synthesizeVoiceTexture(generated.voiceTexture, {
@@ -910,6 +1063,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json({
       ...primary,
       variants,
+      soundPack,
       voiceTexture,
       provider: providerUsed,
       providerFallback,
@@ -925,6 +1079,7 @@ export async function POST(request: Request) {
       error: "AI failed to generate Strudel code",
       fallback: variants[0],
       variants,
+      soundPack: variants[0]?.soundPack ?? defaultSoundPack,
     }, { status: 502 });
 
     return freeGptCountToPersist === undefined

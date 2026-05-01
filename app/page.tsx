@@ -38,6 +38,7 @@ type GeneratedAIComposition = GeneratedComposition & {
   style?: StyleKey;
   analysis?: string;
   shaderStyle?: ShaderStyle;
+  soundPack?: SoundPack;
   provider?: AIProvider;
   providerFallback?: boolean;
   variants?: GeneratedAIVariant[];
@@ -53,6 +54,8 @@ type GeneratedAIVariant = GeneratedComposition & {
   style?: StyleKey;
   analysis?: string;
   shaderStyle?: ShaderStyle;
+  soundPack?: SoundPack;
+  voiceTexture?: VoiceTexture;
 };
 
 type ActivePattern = {
@@ -87,6 +90,18 @@ type VoiceTexture = {
   mimeType?: string;
   disclosure?: string;
 };
+type SoundPack = {
+  id?: string;
+  name?: string;
+  drumBank?: string;
+  character?: string;
+  kick?: string;
+  snare?: string;
+  hat?: string;
+  openHat?: string;
+  texture?: string;
+  rationale?: string;
+};
 type VisualSignal = {
   master: number;
   bass: number;
@@ -104,6 +119,16 @@ type ShaderStyle = {
   metallic: number;
   bloom: number;
   scanline: number;
+};
+
+export type StrudelWorkspaceDemo = {
+  prompt: string;
+  bpm: number;
+  style: StyleKey;
+  imageName: string;
+  imageDataUrl: string;
+  voiceTexture?: VoiceTexture;
+  variants: GeneratedAIVariant[];
 };
 
 type VisualSignalRef = {
@@ -137,6 +162,7 @@ const initialComposition = generateComposition({
 const maxImageDataUrlLength = 1_600_000;
 const imageCompressionDimensions = [1280, 960, 720];
 const imageCompressionQualities = [0.82, 0.72, 0.62, 0.52];
+const autoLoopBarOptions = [4, 8, 16] as const;
 
 const defaultWidgetTracks: WidgetTrack[] = [
   { id: "BASS", label: "$BASS", color: "#f5bd3d" },
@@ -256,6 +282,23 @@ function normalizeShaderStyle(shaderStyle?: Partial<ShaderStyle>): ShaderStyle {
   ) as ShaderStyle;
 }
 
+function normalizeSoundPack(soundPack?: SoundPack): SoundPack | undefined {
+  if (!soundPack?.id && !soundPack?.name) return undefined;
+
+  return {
+    id: soundPack.id,
+    name: soundPack.name ?? soundPack.id,
+    drumBank: soundPack.drumBank ?? "default",
+    character: soundPack.character,
+    kick: soundPack.kick,
+    snare: soundPack.snare,
+    hat: soundPack.hat,
+    openHat: soundPack.openHat,
+    texture: soundPack.texture,
+    rationale: soundPack.rationale,
+  };
+}
+
 function labelForVariant(index: number) {
   return String.fromCharCode(65 + index);
 }
@@ -273,6 +316,8 @@ function normalizeVariant(variant: Partial<GeneratedAIVariant>, index: number, f
     style: variant.style,
     analysis: variant.analysis,
     shaderStyle: normalizeShaderStyle(variant.shaderStyle),
+    soundPack: normalizeSoundPack(variant.soundPack),
+    voiceTexture: normalizeVoiceTexture(variant.voiceTexture) ?? undefined,
   };
 }
 
@@ -789,6 +834,10 @@ function AudioVisualizer({ isPlaying, shaderStyle, signalRef }: { isPlaying: boo
   );
 }
 
+export default function Home() {
+  return <StrudelWorkspace />;
+}
+
 function renderHighlightedCode(code: string, ranges: CodeRange[]) {
   if (!ranges.length) return code;
 
@@ -873,15 +922,32 @@ function canvasHasVisibleSignal(canvas: HTMLCanvasElement | null | undefined, ty
   return false;
 }
 
-export default function Home() {
-  const [prompt, setPrompt] = useState("neon night drive, glass reflections, steady pulse");
-  const [bpm, setBpm] = useState(124);
-  const [style, setStyle] = useState<StyleKey>("dream");
-  const [composition, setComposition] = useState<GeneratedComposition>(initialComposition);
-  const [imagePreview, setImagePreview] = useState<string>("");
-  const [imageDataUrl, setImageDataUrl] = useState<string>("");
-  const [imageName, setImageName] = useState<string>("");
-  const [hasGeneratedPatch, setHasGeneratedPatch] = useState(false);
+export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
+  const demoVariants = useMemo(
+    () => (demo?.variants ?? [])
+      .map((variant, index) => normalizeVariant(variant, index, initialComposition.tracks))
+      .filter(Boolean) as GeneratedAIVariant[],
+    [demo],
+  );
+  const initialDemoVariant = demoVariants[0];
+  const initialDemoComposition: GeneratedComposition = initialDemoVariant
+    ? {
+      title: initialDemoVariant.title,
+      code: normalizeStrudelCode(initialDemoVariant.code),
+      tracks: initialDemoVariant.tracks,
+    }
+    : initialComposition;
+  const initialDemoVoiceTexture = initialDemoVariant?.voiceTexture ?? normalizeVoiceTexture(demo?.voiceTexture);
+  const isReportDemo = Boolean(demo);
+
+  const [prompt, setPrompt] = useState(demo?.prompt ?? "neon night drive, glass reflections, steady pulse");
+  const [bpm, setBpm] = useState(demo?.bpm ?? initialDemoVariant?.bpm ?? 124);
+  const [style, setStyle] = useState<StyleKey>(demo?.style ?? initialDemoVariant?.style ?? "dream");
+  const [composition, setComposition] = useState<GeneratedComposition>(initialDemoComposition);
+  const [imagePreview, setImagePreview] = useState<string>(demo?.imageDataUrl ?? "");
+  const [imageDataUrl, setImageDataUrl] = useState<string>(demo?.imageDataUrl ?? "");
+  const [imageName, setImageName] = useState<string>(demo?.imageName ?? "");
+  const [hasGeneratedPatch, setHasGeneratedPatch] = useState(Boolean(initialDemoVariant));
   const [autoPlayRequested, setAutoPlayRequested] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -892,12 +958,17 @@ export default function Home() {
   const [aiProvider, setAiProvider] = useState<AIProvider>("gpt");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [kananaApiKey, setKananaApiKey] = useState("");
-  const [voiceTextureEnabled, setVoiceTextureEnabled] = useState(false);
-  const [shaderStyle, setShaderStyle] = useState<ShaderStyle>(defaultShaderStyle);
-  const [variants, setVariants] = useState<GeneratedAIVariant[]>([]);
-  const [activeVariantId, setActiveVariantId] = useState("");
+  const [voiceTextureEnabled, setVoiceTextureEnabled] = useState(Boolean(initialDemoVoiceTexture));
+  const [shaderStyle, setShaderStyle] = useState<ShaderStyle>(normalizeShaderStyle(initialDemoVariant?.shaderStyle));
+  const [soundPack, setSoundPack] = useState<SoundPack | undefined>(normalizeSoundPack(initialDemoVariant?.soundPack));
+  const [variants, setVariants] = useState<GeneratedAIVariant[]>(demoVariants);
+  const [activeVariantId, setActiveVariantId] = useState(initialDemoVariant?.id ?? "");
   const [queuedVariantId, setQueuedVariantId] = useState("");
   const [queuedVariantPhase, setQueuedVariantPhase] = useState<"loading" | "ready" | "crossfading" | "">("");
+  const [autoLoopEnabled, setAutoLoopEnabled] = useState(false);
+  const [autoLoopBars, setAutoLoopBars] = useState<typeof autoLoopBarOptions[number]>(8);
+  const [autoLoopRemainingMs, setAutoLoopRemainingMs] = useState(0);
+  const [autoLoopNextLabel, setAutoLoopNextLabel] = useState("");
   const [activeCodeRanges, setActiveCodeRanges] = useState<CodeRange[]>([]);
   const [widgetVisibility, setWidgetVisibility] = useState<WidgetVisibility>({});
   const hasImageMood = imageDataUrl.trim().length > 0;
@@ -928,8 +999,8 @@ export default function Home() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const widgetCanvasRefs = useRef(new Map<string, Partial<Record<WidgetType, HTMLCanvasElement>>>());
   const activePatternRef = useRef<ActivePattern | null>(null);
-  const codeRef = useRef(initialComposition.code);
-  const codeLengthRef = useRef(initialComposition.code.length);
+  const codeRef = useRef(initialDemoComposition.code);
+  const codeLengthRef = useRef(initialDemoComposition.code.length);
   const codeHighlightFrameRef = useRef<number | null>(null);
   const liveEvalTimerRef = useRef<number | null>(null);
   const liveEvalSeqRef = useRef(0);
@@ -937,10 +1008,13 @@ export default function Home() {
   const failedLiveCodeRef = useRef("");
   const widgetVisibilityTimerRef = useRef<number | null>(null);
   const variantSwitchTimerRef = useRef<number | null>(null);
+  const autoLoopTimerRef = useRef<number | null>(null);
+  const autoLoopIntervalRef = useRef<number | null>(null);
+  const autoLoopDueAtRef = useRef(0);
   const shaderTransitionFrameRef = useRef<number | null>(null);
   const transitionRequestRef = useRef(0);
   const audioUnlockPromiseRef = useRef<Promise<void> | null>(null);
-  const voiceTextureRef = useRef<VoiceTexture | null>(null);
+  const voiceTextureRef = useRef<VoiceTexture | null>(initialDemoVoiceTexture ?? null);
   const registeredVoiceSampleRef = useRef("");
   const visualSignalRef = useRef<VisualSignal>({
     master: 0.16,
@@ -979,6 +1053,20 @@ export default function Home() {
       window.clearTimeout(liveEvalTimerRef.current);
       liveEvalTimerRef.current = null;
     }
+  }, []);
+
+  const clearAutoLoopTimer = useCallback(() => {
+    if (autoLoopTimerRef.current !== null) {
+      window.clearTimeout(autoLoopTimerRef.current);
+      autoLoopTimerRef.current = null;
+    }
+    if (autoLoopIntervalRef.current !== null) {
+      window.clearInterval(autoLoopIntervalRef.current);
+      autoLoopIntervalRef.current = null;
+    }
+    autoLoopDueAtRef.current = 0;
+    setAutoLoopRemainingMs(0);
+    setAutoLoopNextLabel("");
   }, []);
 
   const clearQueuedVariantSwitch = useCallback(() => {
@@ -1123,6 +1211,8 @@ export default function Home() {
   }, [composition.code]);
 
   useEffect(() => {
+    if (isReportDemo) return;
+
     const savedProvider = window.localStorage.getItem("strudel-ai-provider");
     const savedOpenAIKey = window.localStorage.getItem("strudel-openai-api-key");
     const savedKananaKey = window.localStorage.getItem("strudel-kanana-api-key");
@@ -1140,31 +1230,35 @@ export default function Home() {
     if (savedVoiceTextureEnabled === "true") {
       setVoiceTextureEnabled(true);
     }
-  }, []);
+  }, [isReportDemo]);
 
   useEffect(() => {
+    if (isReportDemo) return;
     window.localStorage.setItem("strudel-ai-provider", aiProvider);
-  }, [aiProvider]);
+  }, [aiProvider, isReportDemo]);
 
   useEffect(() => {
+    if (isReportDemo) return;
     if (openaiApiKey.trim()) {
       window.localStorage.setItem("strudel-openai-api-key", openaiApiKey.trim());
     } else {
       window.localStorage.removeItem("strudel-openai-api-key");
     }
-  }, [openaiApiKey]);
+  }, [isReportDemo, openaiApiKey]);
 
   useEffect(() => {
+    if (isReportDemo) return;
     if (kananaApiKey.trim()) {
       window.localStorage.setItem("strudel-kanana-api-key", kananaApiKey.trim());
     } else {
       window.localStorage.removeItem("strudel-kanana-api-key");
     }
-  }, [kananaApiKey]);
+  }, [isReportDemo, kananaApiKey]);
 
   useEffect(() => {
+    if (isReportDemo) return;
     window.localStorage.setItem("strudel-voice-texture-enabled", String(voiceTextureEnabled));
-  }, [voiceTextureEnabled]);
+  }, [isReportDemo, voiceTextureEnabled]);
 
   useEffect(() => {
     if (isPlaying && settingsOpen) {
@@ -1221,7 +1315,18 @@ export default function Home() {
     registeredVoiceSampleRef.current = audioDataUrl;
   }, []);
 
+  useEffect(() => {
+    if (!isReportDemo || !runtimeReady) return;
+
+    void registerVoiceTexture().then(() => {
+      setStatus("Report demo ready with voice sample preloaded");
+    }).catch((error) => {
+      console.debug("Report demo voice preload skipped", error);
+    });
+  }, [activeVariantId, isReportDemo, registerVoiceTexture, runtimeReady]);
+
   const resetPlaybackForPatchChange = useCallback(() => {
+    clearAutoLoopTimer();
     clearQueuedVariantSwitch();
     clearLiveEvalTimer();
     stopShaderTransition();
@@ -1235,7 +1340,7 @@ export default function Home() {
     stopCodeHighlightLoop();
     setIsPlaying(false);
     setAutoPlayRequested(false);
-  }, [clearLiveEvalTimer, clearQueuedVariantSwitch, clearWidgetVisibilityMonitor, stopCodeHighlightLoop, stopShaderTransition, widgetTracks]);
+  }, [clearAutoLoopTimer, clearLiveEvalTimer, clearQueuedVariantSwitch, clearWidgetVisibilityMonitor, stopCodeHighlightLoop, stopShaderTransition, widgetTracks]);
 
   const applyVariant = useCallback((variant: GeneratedAIVariant, shouldAutoplay = isPlaying) => {
     resetPlaybackForPatchChange();
@@ -1247,8 +1352,13 @@ export default function Home() {
     setHasGeneratedPatch(true);
     setActiveVariantId(variant.id ?? "");
     setShaderStyle(normalizeShaderStyle(variant.shaderStyle));
+    setSoundPack(normalizeSoundPack(variant.soundPack));
     if (typeof variant.bpm === "number") setBpm(variant.bpm);
     if (variant.style) setStyle(variant.style);
+    if (variant.voiceTexture) {
+      voiceTextureRef.current = normalizeVoiceTexture(variant.voiceTexture);
+      registeredVoiceSampleRef.current = "";
+    }
     setStatus(variant.analysis ? `${variant.label ?? "Variant"}: ${variant.analysis}` : `Loaded ${variant.label ?? "variant"}`);
     setAutoPlayRequested(shouldAutoplay);
   }, [isPlaying, resetPlaybackForPatchChange]);
@@ -1275,8 +1385,13 @@ export default function Home() {
       setHasGeneratedPatch(true);
       setActiveVariantId(options.activeVariantId ?? variant.id ?? "");
       setShaderStyle(normalizeShaderStyle(variant.shaderStyle));
+      setSoundPack(normalizeSoundPack(variant.soundPack));
       if (typeof variant.bpm === "number") setBpm(variant.bpm);
       if (variant.style) setStyle(variant.style);
+      if (variant.voiceTexture) {
+        voiceTextureRef.current = normalizeVoiceTexture(variant.voiceTexture);
+        registeredVoiceSampleRef.current = "";
+      }
       if (!options.keepQueued) {
         setQueuedVariantId("");
         setQueuedVariantPhase("");
@@ -1382,8 +1497,8 @@ export default function Home() {
     const targetStyle = normalizeShaderStyle(targetVariant.shaderStyle);
     const cps = cyclesPerSecondFromCode(composition.code, bpm);
     const cycleMs = Math.round(1000 / cps);
-    const transitionBars = 8;
-    const bridgeMs = Math.max(8000, cycleMs * transitionBars);
+    const transitionBars = 4;
+    const bridgeMs = Math.max(4000, cycleMs * transitionBars);
 
     if (bridgeVariant) {
       const bridgedVariant = {
@@ -1420,6 +1535,20 @@ export default function Home() {
   }, [activeVariantId, animateShaderTransition, bpm, composition.code, evaluateVariantNow, shaderStyle]);
 
   const cueVariantSwitch = useCallback(async (variant: GeneratedAIVariant) => {
+    clearAutoLoopTimer();
+
+    if (isReportDemo) {
+      if (isPlaying) {
+        void evaluateVariantNow(variant, {
+          status: `Playing ${variant.label ?? "variant"}`,
+          activeVariantId: variant.id ?? "",
+        });
+      } else {
+        applyVariant(variant, false);
+      }
+      return;
+    }
+
     if (!isPlaying || !runtimeRef.current?.getTime) {
       applyVariant(variant, isPlaying);
       return;
@@ -1466,18 +1595,65 @@ export default function Home() {
     }
 
     const cps = cyclesPerSecondFromCode(composition.code, bpm);
-    const quantizeLeadMs = 90;
+    const quantizeLeadMs = 60;
     const firstNextCycle = Math.floor(currentTime) + 1;
-    const firstDelayMs = ((firstNextCycle - currentTime) / cps) * 1000;
-    const nextCycle = firstDelayMs < quantizeLeadMs + 80 ? firstNextCycle + 1 : firstNextCycle;
-    const remainingCycles = Math.max(0.015, nextCycle - currentTime);
+    const remainingCycles = Math.max(0.015, firstNextCycle - currentTime);
     const delayMs = Math.max(0, Math.round((remainingCycles / cps) * 1000) - quantizeLeadMs);
 
     setStatus(bridgeVariant ? `AI bridge ready for ${variant.label ?? "variant"}` : `Queued ${variant.label ?? "variant"} for next bar`);
     variantSwitchTimerRef.current = window.setTimeout(() => {
       scheduleVariantSequence(variant, bridgeVariant);
     }, delayMs);
-  }, [activeVariantId, applyVariant, bpm, clearQueuedVariantSwitch, composition.code, isPlaying, queuedVariantId, requestTransitionBridge, scheduleVariantSequence]);
+  }, [activeVariantId, applyVariant, bpm, clearAutoLoopTimer, clearQueuedVariantSwitch, composition.code, evaluateVariantNow, isPlaying, isReportDemo, queuedVariantId, requestTransitionBridge, scheduleVariantSequence]);
+
+  useEffect(() => {
+    clearAutoLoopTimer();
+
+    if (!autoLoopEnabled || !isPlaying || variants.length < 2 || queuedVariantId || queuedVariantPhase || isGenerating || isEvaluating) {
+      return;
+    }
+
+    const activeIndex = variants.findIndex((variant) => variant.id === activeVariantId);
+    if (activeIndex < 0) return;
+
+    const cps = cyclesPerSecondFromCode(composition.code, bpm);
+    const holdMs = Math.max(2000, Math.round((autoLoopBars / cps) * 1000));
+    const nextVariant = variants[(activeIndex + 1) % variants.length];
+    autoLoopDueAtRef.current = performance.now() + holdMs;
+    setAutoLoopRemainingMs(holdMs);
+    setAutoLoopNextLabel(nextVariant.label ?? "variant");
+    autoLoopIntervalRef.current = window.setInterval(() => {
+      const remaining = Math.max(0, autoLoopDueAtRef.current - performance.now());
+      setAutoLoopRemainingMs(remaining);
+    }, 250);
+
+    autoLoopTimerRef.current = window.setTimeout(() => {
+      setStatus(`Auto cue ${nextVariant.label ?? "variant"}`);
+      void cueVariantSwitch(nextVariant);
+    }, holdMs);
+
+    return clearAutoLoopTimer;
+  }, [
+    activeVariantId,
+    autoLoopBars,
+    autoLoopEnabled,
+    bpm,
+    clearAutoLoopTimer,
+    composition.code,
+    cueVariantSwitch,
+    isEvaluating,
+    isGenerating,
+    isPlaying,
+    queuedVariantId,
+    queuedVariantPhase,
+    variants,
+  ]);
+
+  const autoLoopRemainingBars = useMemo(() => {
+    if (!autoLoopRemainingMs) return 0;
+    const cps = cyclesPerSecondFromCode(composition.code, bpm);
+    return Math.max(0, Math.ceil((autoLoopRemainingMs / 1000) * cps));
+  }, [autoLoopRemainingMs, bpm, composition.code]);
 
   const requestVariants = useCallback(async (mode: "generate" | "evolve") => {
     if (!hasImageMood) {
@@ -1498,6 +1674,7 @@ export default function Home() {
         bpm,
         style,
         shaderStyle,
+        soundPack,
       }])
       : undefined;
 
@@ -1538,8 +1715,9 @@ export default function Home() {
         fallback?: GeneratedComposition;
         requiresApiKey?: boolean;
       };
+      const responseSoundPack = normalizeSoundPack(result.soundPack);
       const normalizedVariants = (result.variants ?? [])
-        .map((variant, index) => normalizeVariant(variant, index, composition.tracks))
+        .map((variant, index) => normalizeVariant({ ...variant, soundPack: variant.soundPack ?? responseSoundPack }, index, composition.tracks))
         .filter(Boolean) as GeneratedAIVariant[];
       const voiceTexture = normalizeVoiceTexture(result.voiceTexture);
       voiceTextureRef.current = voiceTexture;
@@ -1555,7 +1733,7 @@ export default function Home() {
           setVariants(normalizedVariants);
           applyVariant(normalizedVariants[0], true);
         } else if (result.fallback) {
-          const fallbackVariant = normalizeVariant(result.fallback, 0, composition.tracks);
+          const fallbackVariant = normalizeVariant({ ...result.fallback, soundPack: responseSoundPack }, 0, composition.tracks);
           if (fallbackVariant) {
             setVariants([fallbackVariant]);
             applyVariant(fallbackVariant, true);
@@ -1574,7 +1752,7 @@ export default function Home() {
         setVariants(normalizedVariants);
         applyVariant(normalizedVariants[0], true);
       } else if (result.code) {
-        const singleVariant = normalizeVariant(result, 0, composition.tracks);
+        const singleVariant = normalizeVariant({ ...result, soundPack: result.soundPack ?? responseSoundPack }, 0, composition.tracks);
         if (singleVariant) {
           setVariants([singleVariant]);
           applyVariant(singleVariant, true);
@@ -1595,16 +1773,17 @@ export default function Home() {
       }
       const providerLabel = result.provider === "kanana" ? "Kanana" : "GPT";
       const fallbackLabel = result.providerFallback ? " (GPT fallback)" : "";
+      const packLabel = responseSoundPack?.name ? ` · ${responseSoundPack.name}` : "";
       setStatus(mode === "evolve"
-        ? `Evolved ${normalizedVariants.length || 1} variants with ${providerLabel}${fallbackLabel}`
-        : `Generated ${normalizedVariants.length || 1} variants with ${providerLabel}${fallbackLabel}`);
+        ? `Evolved ${normalizedVariants.length || 1} variants with ${providerLabel}${fallbackLabel}${packLabel}`
+        : `Generated ${normalizedVariants.length || 1} variants with ${providerLabel}${fallbackLabel}${packLabel}`);
     } catch (error) {
       console.error(error);
       setStatus("Could not reach AI generator");
     } finally {
       setIsGenerating(false);
     }
-  }, [aiProvider, applyVariant, bpm, composition.code, composition.title, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, openaiApiKey, patchReady, prompt, registerVoiceTexture, resetPlaybackForPatchChange, shaderStyle, style, unlockAudioEngine, variants, voiceTextureEnabled]);
+  }, [aiProvider, applyVariant, bpm, composition.code, composition.title, composition.tracks, hasImageMood, imageDataUrl, imageName, kananaApiKey, openaiApiKey, patchReady, prompt, registerVoiceTexture, resetPlaybackForPatchChange, shaderStyle, soundPack, style, unlockAudioEngine, variants, voiceTextureEnabled]);
 
   const generate = useCallback(async () => {
     await requestVariants("generate");
@@ -1884,7 +2063,7 @@ export default function Home() {
   }
 
   return (
-    <main className="shell" onPointerDownCapture={primeAudioFromUserGesture}>
+    <main className={isReportDemo ? "shell report-demo-workspace" : "shell"} onPointerDownCapture={primeAudioFromUserGesture}>
       <section className="mobile-gate" aria-label="Desktop required">
         <div className="mobile-gate-content">
           <strong>PC에서 접속해 주세요</strong>
@@ -1902,7 +2081,7 @@ export default function Home() {
           <button
             type="button"
             className="drop-zone"
-            onClick={openImagePicker}
+            onClick={isReportDemo ? undefined : openImagePicker}
           >
             {imagePreview ? (
               <img src={imagePreview} alt="" />
@@ -1923,11 +2102,11 @@ export default function Home() {
           />
 
           <div className="button-grid">
-            <button className="primary" onClick={generate} disabled={isGenerating}>
+            <button className="primary" onClick={generate} disabled={isGenerating || isReportDemo}>
               {isGenerating ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
-              {isGenerating ? "Generating" : "Generate"}
+              {isReportDemo ? "Report Demo" : isGenerating ? "Generating" : "Generate"}
             </button>
-            <button onClick={() => setSettingsOpen(true)} disabled={isPlaying}>
+            <button onClick={() => setSettingsOpen(true)} disabled={isPlaying || isReportDemo}>
               <Settings size={17} />
               Settings
             </button>
@@ -1961,10 +2140,46 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              <button className="evolve-button" onClick={evolve} disabled={isGenerating || variants.length === 0}>
+              <button className="evolve-button" onClick={evolve} disabled={isGenerating || isReportDemo || variants.length === 0}>
                 {isGenerating ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />}
                 Evolve
               </button>
+              <div className="auto-loop-panel" aria-label="Auto variant loop">
+                <button
+                  type="button"
+                  className={autoLoopEnabled ? "auto-loop-toggle active" : "auto-loop-toggle"}
+                  onClick={() => setAutoLoopEnabled((enabled) => !enabled)}
+                  disabled={!patchReady || variants.length < 2}
+                >
+                  Auto Loop
+                  <span>{autoLoopEnabled ? "On" : "Off"}</span>
+                </button>
+                <div className="auto-loop-bars" aria-label="Auto loop hold bars">
+                  {autoLoopBarOptions.map((bars) => (
+                    <button
+                      type="button"
+                      className={autoLoopBars === bars ? "active" : ""}
+                      key={bars}
+                      onClick={() => setAutoLoopBars(bars)}
+                    >
+                      {bars}
+                    </button>
+                  ))}
+                </div>
+                {autoLoopEnabled && isPlaying && autoLoopNextLabel ? (
+                  <div className="auto-loop-countdown">
+                    <span>Next {autoLoopNextLabel}</span>
+                    <em>{autoLoopRemainingBars} bars · {Math.ceil(autoLoopRemainingMs / 1000)}s</em>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {soundPack ? (
+            <div className="sound-pack-chip" title={soundPack.rationale}>
+              <span>{soundPack.name}</span>
+              <em>{soundPack.drumBank === "default" ? "default samples" : soundPack.drumBank}</em>
             </div>
           ) : null}
 

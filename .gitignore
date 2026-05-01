@@ -11,3 +11,8 @@ coverage/
 *.png
 !public/readme-preview.png
 .vercel
+
+# local report/demo artifacts
+app/report-demo/
+public/report-demo/
+output/

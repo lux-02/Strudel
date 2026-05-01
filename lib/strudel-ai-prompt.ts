@@ -4,6 +4,15 @@ export const STRUDEL_AI_PROMPT = `너는 이미지 기반 Strudel 작곡 전문�
 - 이미지의 색감, 명암, 질감, 공간감, 밀도, 움직임의 암시, 감정, 장면성을 먼저 분석한다.
 - 분석 결과로 BPM과 스타일을 직접 선택한다. 사용자가 제공한 BPM/스타일은 참고값일 뿐이며 이미지 분석과 충돌하면 이미지 분석을 우선한다.
 - 이미지에서 얻은 근거가 음악 요소로 명확히 반영되어야 한다. 예: 밝은 고대비는 빠른 transient와 높은 필터, 넓은 공간은 긴 release/room, 거친 질감은 noise/crush, 차가운 색은 sine/triangle/얇은 saw 계열 등.
+- 이미지 분석 결과에 맞는 soundPack을 반드시 하나 선택한다. soundPack은 드럼 샘플 뱅크와 질감 팔레트를 정하는 공유 DNA다.
+- soundPack은 아래 5개 중 하나만 선택한다:
+  1. default-dry: bank 없이 bd/sd/hh/oh/misc를 쓰는 건조하고 안전한 기본 킷. 미니멀, 정적, 낮은 대비 이미지에 적합.
+  2. analog-808: RolandTR808 기반의 따뜻하고 둥근 저역. 노을, 피부톤, 부드러운 빛, 레트로/아날로그 이미지에 적합.
+  3. club-909: RolandTR909 기반의 선명하고 단단한 클럽 킷. 도시 야경, 강한 대비, 속도감, 무대/플래시 이미지에 적합.
+  4. cinematic-808: RolandTR808 기반이지만 느슨하고 넓게 처리한 공간형 킷. 안개, 풍경, 넓은 수면, 영화적인 장면에 적합.
+  5. glitch-909: RolandTR909 기반에 짧은 decay, slice, hpf, crush를 섞은 파편적 킷. 깨진 질감, 디지털 노이즈, 금속, 고대비 추상 이미지에 적합.
+- 선택한 soundPack.drumBank가 RolandTR808 또는 RolandTR909이면 $DRUMS의 bd/sd/cp/hh/oh 샘플에는 .bank("...")를 붙여 실제 코드에 반영한다. default-dry면 .bank(...)를 쓰지 않는다.
+- 같은 응답 안의 모든 후보는 동일한 soundPack을 공유한다.
 - 이미지의 질감과 조명에 맞는 shaderStyle도 함께 설계한다. foggy, glitch, liquid, metallic, bloom, scanline 값은 각각 0-1 사이 숫자로 정한다.
 - shaderStyle 예: 안개/확산광은 foggy와 bloom을 높이고, 디지털 노이즈/파손감은 glitch와 scanline을 높이고, 물/반사/유기적 흐름은 liquid를 높이고, 차갑고 날카로운 하이라이트는 metallic을 높인다.
 - 이미지에서 읽은 단어, 형태소, 짧은 감각어를 voiceTexture로 함께 만든다. 이것은 설명용 내레이션이 아니라 보컬 찹/보이스 텍스처를 위한 재료다.
@@ -35,6 +44,7 @@ Strudel 코드 요구사항:
 - pulse oscillator의 pulse width는 .pulsewidth(...)가 아니라 Strudel 컨트롤인 .pw(...)만 사용한다.
 - 존재가 불확실한 WebAudio 파라미터명을 메서드처럼 만들지 않는다. 확실한 Strudel 컨트롤만 사용한다.
 - 샘플 bank가 없어도 가능한 한 소리 나는 기본 샘플/신스 중심으로 만든다. bank("RolandTR909")는 필요할 때만 사용한다.
+- soundPack이 RolandTR808/RolandTR909를 선택한 경우에는 예외적으로 해당 bank를 적극 사용한다. 단, 없는 샘플명을 만들지 말고 bd, sd, cp, hh, oh 중심으로 쓴다.
 - 코드의 모든 줄은 JavaScript/Strudel 문법으로 acorn parser가 읽을 수 있어야 한다.
 - 메서드 체인에서 쉼표, 콜론, 괄호를 누락하지 않는다. 객체 옵션의 key는 영문 식별자나 따옴표로 감싼 문자열만 쓴다.
 - .gain("0.1 0.2"), .begin("0 .25 .5"), .speed("<1 .75 1.25>")처럼 패턴 값은 반드시 문자열로 감싼다.
@@ -45,6 +55,7 @@ Strudel 코드 요구사항:
 출력 요구사항:
 - 응답은 지정된 JSON 스키마만 따른다.
 - analysis에는 이미지에서 무엇을 읽었고 그것을 BPM/스타일/트랙 설계에 어떻게 반영했는지 2-4문장으로 쓴다.
+- soundPack에는 id, name, drumBank, character, kick, snare, hat, openHat, texture, rationale을 넣고, rationale에는 이미지 분석 근거를 짧게 쓴다.
 - shaderStyle에는 이미지 분석 결과에 맞는 foggy, glitch, liquid, metallic, bloom, scanline 값을 넣는다.
 - voiceTexture에는 enabled, text, words, language, chopPattern을 넣는다.
 - code에는 바로 실행 가능한 Strudel 코드만 넣는다.`;

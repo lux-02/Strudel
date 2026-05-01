@@ -40,11 +40,20 @@ Strudel AI Visual Coder는 이미지를 입력값으로 삼아 사운드, 코드
 - **오디오 반응형 셰이더**: 드럼, 베이스, 멜로디, 신스, 텍스처 신호가 각각 다른 WebGL 효과에 연결됩니다.
 - **Variant + Evolve**: A/B/C/D 변주를 생성하고, 현재 변주들을 바탕으로 이어지는 새 변주를 만듭니다.
 - **DJ식 큐 전환**: 재생 중 변주를 선택하면 다음 마디 기준으로 큐하고, AI bridge를 통해 긴 크로스페이드를 시도합니다.
+- **Auto Loop**: A/B/C/D 변주를 4/8/16마디 단위로 자동 순환시키고, 각 전환은 기존 큐/bridge/crossfade 흐름을 사용합니다.
 - **AI Visual Style Generator**: 이미지 분석 결과로 `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, `scanline` 값을 생성합니다.
+- **AI Sound Pack Selector**: 이미지의 빛, 질감, 장면성에 따라 `default-dry`, `analog-808`, `club-909`, `cinematic-808`, `glitch-909` 중 하나를 선택하고 Strudel 샘플 bank 사용 여부를 코드에 반영합니다.
 - **Semantic Vocal Chop 옵션**: 기본 생성에서는 TTS를 끄고, Settings에서 Voice Texture TTS를 켜면 이미지에서 추출한 단어와 형태소를 AI 음성으로 합성해 `$VOICE` 트랙에서 보컬 찹처럼 사용합니다.
 - **GPT / Kanana 선택**: 기본은 OpenAI GPT입니다. Kanana 선택 시 Kanana가 이미지의 로컬/언어적 감각 초안을 만들고, GPT가 이를 실행 가능한 Strudel 코드로 컴파일합니다. GPT 무료 생성 한도를 넘으면 Settings에서 개인 OpenAI API Key를 입력해 계속 사용할 수 있습니다.
 - **무료 생성 한도**: 비로그인 사용자는 브라우저 쿠키 기준 하루 5회까지 서버 GPT 키로 생성할 수 있고, 이후에는 개인 API Key 입력이 필요합니다.
 - **HEIC/HEIF 지원**: iPhone 이미지는 브라우저에서 JPEG로 변환한 뒤 분석합니다.
+
+### 최근 업그레이드
+
+- **체계적인 Sound Pack 선택**: 이미지 분석 결과에 따라 기본 샘플, 808, 909 계열 사운드 팩을 선택하고, 선택된 drum bank가 실제 Strudel 코드에 반영되도록 서버에서 보정합니다.
+- **Auto Loop 퍼포먼스 모드**: A/B/C/D 변주를 4/8/16마디 단위로 자동 순환시키며, 각 전환은 기존 AI bridge와 4마디 crossfade를 사용합니다.
+- **전환 카운트다운**: Auto Loop 재생 중 다음 변주까지 남은 마디와 시간을 표시해 캡처/라이브 퍼포먼스 흐름을 읽기 쉽게 했습니다.
+- **짧아진 큐 전환**: 큐 대기는 다음 마디 기준으로 정렬하고, bridge/crossfade 기본 길이는 4마디로 조정했습니다.
 
 ### 사용 방법
 
@@ -151,11 +160,13 @@ flowchart LR
   B --> C["/api/generate-strudel"]
   C --> D["Image Analysis<br/>GPT or Kanana Draft"]
   D --> E["GPT Compile<br/>Strict Strudel JSON"]
+  E --> M["Sound Pack Selection<br/>Default / 808 / 909"]
+  M --> N["Bank-Aware Strudel Code"]
   E --> F["Voice Texture<br/>Words / Morphemes"]
   F --> G["TTS<br/>OpenAI or Kanana Audio"]
   G --> H["Register `voice` Sample"]
-  E --> I["CodeMirror Editor"]
-  E --> J["@strudel/web Runtime"]
+  N --> I["CodeMirror Editor"]
+  N --> J["@strudel/web Runtime"]
   H --> J
   I --> J
   J --> K["Track Widgets<br/>Pianoroll / Waveform"]
@@ -177,13 +188,15 @@ flowchart TB
   subgraph Server["Next.js API Route"]
     Prompt["Prompt Builder"]
     Model["GPT / Kanana"]
+    SoundPack["Sound Pack Normalizer"]
     Syntax["Strudel Syntax Check"]
     TTS["TTS / Audio Stream"]
   end
 
   Upload --> Server
   Prompt --> Model
-  Model --> Syntax
+  Model --> SoundPack
+  SoundPack --> Syntax
   Model --> TTS
   Syntax --> Editor
   Syntax --> Runtime
@@ -217,6 +230,7 @@ npm run build
 
 - 업로드 이미지는 API 요청 크기 제한을 피하기 위해 클라이언트에서 압축됩니다.
 - 모바일 브라우저에서는 오디오 정책, WebGL 성능, 코드 편집 UX가 불안정할 수 있어 데스크톱 전용 안내 화면을 표시합니다.
+- Sound Pack은 AI 응답 스키마의 필수 필드이며, 서버가 선택된 drum bank를 코드에 보정 적용해 메타데이터와 실제 Strudel 실행 코드가 어긋나지 않게 합니다.
 - AI가 생성한 Strudel 코드에 브라우저 런타임과 맞지 않는 표현이 들어올 수 있어 `normalizeStrudelCode`에서 일부 표현을 보정합니다.
 - 서버는 생성된 Strudel 코드를 브라우저에 보내기 전에 문법 검사를 수행합니다. Kanana 선택 시에는 Kanana 초안을 GPT가 strict JSON/Strudel 코드로 컴파일하고, 그래도 실패하면 GPT 직접 생성 fallback 경로를 사용합니다.
 - 브라우저 자동재생 정책 때문에 `Generate` 또는 `Play` 시점에 오디오 컨텍스트를 먼저 깨웁니다.
