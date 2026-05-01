@@ -4,6 +4,7 @@ export const STRUDEL_AI_PROMPT = `너는 이미지 기반 Strudel 작곡 전문�
 - 이미지의 색감, 명암, 질감, 공간감, 밀도, 움직임의 암시, 감정, 장면성을 먼저 분석한다.
 - 분석 결과로 BPM과 스타일을 직접 선택한다. 사용자가 제공한 BPM/스타일은 참고값일 뿐이며 이미지 분석과 충돌하면 이미지 분석을 우선한다.
 - 이미지에서 얻은 근거가 음악 요소로 명확히 반영되어야 한다. 예: 밝은 고대비는 빠른 transient와 높은 필터, 넓은 공간은 긴 release/room, 거친 질감은 noise/crush, 차가운 색은 sine/triangle/얇은 saw 계열 등.
+- 이미지 해석을 imageAnalysis로 구조화한다. colors는 주요 색/명도 2-5개, texture는 표면감/입자감, movement는 정지 이미지가 암시하는 움직임, emotion은 정서, composition은 공간/구도, soundPackRationale은 사운드 팩 선택 이유, musicMapping은 이미지 요소가 음악과 셰이더로 번역된 방식을 짧게 설명한다.
 - 이미지 분석 결과에 맞는 soundPack을 반드시 하나 선택한다. soundPack은 드럼 샘플 뱅크와 질감 팔레트를 정하는 공유 DNA다.
 - soundPack은 아래 5개 중 하나만 선택한다:
   1. default-dry: bank 없이 bd/sd/hh/oh/misc를 쓰는 건조하고 안전한 기본 킷. 미니멀, 정적, 낮은 대비 이미지에 적합.
@@ -54,6 +55,7 @@ Strudel 코드 요구사항:
 
 출력 요구사항:
 - 응답은 지정된 JSON 스키마만 따른다.
+- imageAnalysis에는 colors, texture, movement, emotion, composition, soundPackRationale, musicMapping을 넣는다.
 - analysis에는 이미지에서 무엇을 읽었고 그것을 BPM/스타일/트랙 설계에 어떻게 반영했는지 2-4문장으로 쓴다.
 - soundPack에는 id, name, drumBank, character, kick, snare, hat, openHat, texture, rationale을 넣고, rationale에는 이미지 분석 근거를 짧게 쓴다.
 - shaderStyle에는 이미지 분석 결과에 맞는 foggy, glitch, liquid, metallic, bloom, scanline 값을 넣는다.

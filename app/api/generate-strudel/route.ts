@@ -39,6 +39,16 @@ type StrudelAIVariant = {
   tracks: string[];
 };
 
+type ImageAnalysis = {
+  colors: string[];
+  texture: string;
+  movement: string;
+  emotion: string;
+  composition: string;
+  soundPackRationale: string;
+  musicMapping: string;
+};
+
 type SoundPack = {
   id: "default-dry" | "analog-808" | "club-909" | "cinematic-808" | "glitch-909";
   name: string;
@@ -64,6 +74,7 @@ type VoiceTexture = {
 };
 
 type StrudelAIResponse = StrudelAIVariant | {
+  imageAnalysis: ImageAnalysis;
   soundPack: SoundPack;
   variants: StrudelAIVariant[];
   voiceTexture?: VoiceTexture;
@@ -71,6 +82,7 @@ type StrudelAIResponse = StrudelAIVariant | {
 
 type GeneratedPatchResult = {
   variants: Awaited<ReturnType<typeof parseGeneratedVariant>>[];
+  imageAnalysis: ImageAnalysis;
   soundPack: SoundPack;
   voiceTexture?: VoiceTexture;
 };
@@ -261,20 +273,21 @@ ${parentBlock}
 2. 분석 결과에 맞는 BPM을 60-190 사이에서 직접 선택한다.
 3. 분석 결과에 맞는 style을 dream, club, cinematic, glitch, ambient 중 하나로 직접 선택한다.
 4. 먼저 하나의 performance DNA를 정한다: bpm, style, scale/key, drumBackbone, bassRootMotion, soundPalette, soundPack.
-5. 이미지 근거에 맞춰 soundPack을 default-dry, analog-808, club-909, cinematic-808, glitch-909 중 하나로 선택한다.
-6. 선택한 soundPack.drumBank가 RolandTR808 또는 RolandTR909이면 $DRUMS의 bd/sd/cp/hh/oh 샘플에 .bank("선택한 bank")를 붙여 코드에 실제 반영한다. default이면 bank를 붙이지 않는다.
-7. mode가 generate이면 서로 다른 곡 후보가 아니라 같은 performance DNA 안에서 즉시 믹스 가능한 후보 ${variantCount}개를 만든다.
-8. mode가 evolve이면 부모 패치의 performance DNA와 soundPack 성격을 유지하면서 offspring ${variantCount}개를 만든다. 장르, BPM, scale/key를 바꾸지 않는다.
-9. mode가 bridge이면 Parent 1에서 Parent 2로 넘어가는 전환용 패치 1개만 만든다. Parent 1의 $DRUMS 그루브와 soundPack 성격을 유지하고, Parent 2의 코드/스케일/화성 중심으로 filter가 상승하는 느낌을 만들며, $MEL은 Parent 1의 음형에서 Parent 2의 음형으로 변형되는 중간 형태여야 한다. shaderStyle은 Parent 2에 70-85% 가까운 값으로 만든다.
-10. 같은 응답의 모든 후보는 동일한 setcps, 동일한 style, 동일한 soundPack, 호환 가능한 scale/key, 유사한 $DRUMS backbone, 유사한 $BASS root motion을 유지한다.
-11. 후보 간 차이는 $MEL, $SYNTH, $LIGHT, $TEXTURE, 필터/룸/딜레이, shaderStyle 강도에서 만든다.
-12. 라이브 전환이 자연스럽도록 큰 변화는 $MEL, $SYNTH, $LIGHT, $TEXTURE 쪽에서 만들고 $DRUMS/$BASS는 안정적으로 유지한다.
-13. Voice texture TTS가 enabled이고 mode가 bridge가 아니면 모든 후보 코드에 $VOICE 트랙을 포함한다. $VOICE는 s("voice")를 begin/end/speed로 잘라 쓰는 낮은 gain의 vocal chop이어야 한다.
-14. Voice texture TTS가 enabled이면 voiceTexture는 같은 응답의 모든 후보가 공유하는 음성 재료다. 이미지에서 나온 단어 5-9개를 만들고 TTS가 읽기 쉬운 짧은 text로 압축한다.
-15. Voice texture TTS가 disabled이거나 mode가 bridge이면 voiceTexture.enabled는 false로 두고 $VOICE 트랙을 만들지 않는다.
-16. 예시 코드나 기존 진행을 복제하지 않는다.
+5. imageAnalysis를 만든다. colors는 주요 색/명도 2-5개, texture는 물성/표면감, movement는 이미지가 암시하는 움직임, emotion은 정서, composition은 구도/공간감, soundPackRationale은 soundPack 선택 이유, musicMapping은 이미지 요소가 리듬/음색/스케일/셰이더로 어떻게 번역됐는지 쓴다.
+6. 이미지 근거에 맞춰 soundPack을 default-dry, analog-808, club-909, cinematic-808, glitch-909 중 하나로 선택한다.
+7. 선택한 soundPack.drumBank가 RolandTR808 또는 RolandTR909이면 $DRUMS의 bd/sd/cp/hh/oh 샘플에 .bank("선택한 bank")를 붙여 코드에 실제 반영한다. default이면 bank를 붙이지 않는다.
+8. mode가 generate이면 서로 다른 곡 후보가 아니라 같은 performance DNA 안에서 즉시 믹스 가능한 후보 ${variantCount}개를 만든다.
+9. mode가 evolve이면 부모 패치의 performance DNA와 soundPack 성격을 유지하면서 offspring ${variantCount}개를 만든다. 장르, BPM, scale/key를 바꾸지 않는다.
+10. mode가 bridge이면 Parent 1에서 Parent 2로 넘어가는 전환용 패치 1개만 만든다. Parent 1의 $DRUMS 그루브와 soundPack 성격을 유지하고, Parent 2의 코드/스케일/화성 중심으로 filter가 상승하는 느낌을 만들며, $MEL은 Parent 1의 음형에서 Parent 2의 음형으로 변형되는 중간 형태여야 한다. shaderStyle은 Parent 2에 70-85% 가까운 값으로 만든다.
+11. 같은 응답의 모든 후보는 동일한 setcps, 동일한 style, 동일한 soundPack, 호환 가능한 scale/key, 유사한 $DRUMS backbone, 유사한 $BASS root motion을 유지한다.
+12. 후보 간 차이는 $MEL, $SYNTH, $LIGHT, $TEXTURE, 필터/룸/딜레이, shaderStyle 강도에서 만든다.
+13. 라이브 전환이 자연스럽도록 큰 변화는 $MEL, $SYNTH, $LIGHT, $TEXTURE 쪽에서 만들고 $DRUMS/$BASS는 안정적으로 유지한다.
+14. Voice texture TTS가 enabled이고 mode가 bridge가 아니면 모든 후보 코드에 $VOICE 트랙을 포함한다. $VOICE는 s("voice")를 begin/end/speed로 잘라 쓰는 낮은 gain의 vocal chop이어야 한다.
+15. Voice texture TTS가 enabled이면 voiceTexture는 같은 응답의 모든 후보가 공유하는 음성 재료다. 이미지에서 나온 단어 5-9개를 만들고 TTS가 읽기 쉬운 짧은 text로 압축한다.
+16. Voice texture TTS가 disabled이거나 mode가 bridge이면 voiceTexture.enabled는 false로 두고 $VOICE 트랙을 만들지 않는다.
+17. 예시 코드나 기존 진행을 복제하지 않는다.
 
-반드시 {"soundPack": {...}, "voiceTexture": {...}, "variants":[...]} 형태의 JSON 객체만 반환한다. variants 길이는 ${variantCount}개여야 한다. Markdown 코드펜스나 설명 문장을 JSON 밖에 쓰지 않는다.`;
+반드시 {"imageAnalysis": {...}, "soundPack": {...}, "voiceTexture": {...}, "variants":[...]} 형태의 JSON 객체만 반환한다. variants 길이는 ${variantCount}개여야 한다. Markdown 코드펜스나 설명 문장을 JSON 밖에 쓰지 않는다.`;
 }
 
 function normalizeShaderStyle(shaderStyle?: Partial<ShaderStyle>): ShaderStyle {
@@ -296,6 +309,27 @@ function normalizeSoundPack(soundPack?: Partial<SoundPack>): SoundPack {
   return {
     ...catalogPack,
     rationale: rationale || defaultSoundPack.rationale,
+  };
+}
+
+function normalizeImageAnalysis(
+  imageAnalysis: Partial<ImageAnalysis> | undefined,
+  soundPack: SoundPack,
+  fallbackAnalysis = "",
+): ImageAnalysis {
+  const colors = (imageAnalysis?.colors ?? [])
+    .map((color) => String(color).trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  return {
+    colors: colors.length ? colors : ["unknown"],
+    texture: String(imageAnalysis?.texture ?? "not specified").trim().slice(0, 90) || "not specified",
+    movement: String(imageAnalysis?.movement ?? "not specified").trim().slice(0, 90) || "not specified",
+    emotion: String(imageAnalysis?.emotion ?? "not specified").trim().slice(0, 90) || "not specified",
+    composition: String(imageAnalysis?.composition ?? "not specified").trim().slice(0, 110) || "not specified",
+    soundPackRationale: String(imageAnalysis?.soundPackRationale ?? soundPack.rationale).trim().slice(0, 140) || soundPack.rationale,
+    musicMapping: String(imageAnalysis?.musicMapping ?? fallbackAnalysis).trim().slice(0, 160) || "Mapped to BPM, rhythm density, timbre, shader and track balance.",
   };
 }
 
@@ -362,6 +396,7 @@ async function parseGeneratedPatch(output: string, fallbackBpm: number, fallback
   }
 
   const anchor = variants[0];
+  const imageAnalysis = normalizeImageAnalysis("variants" in generated ? generated.imageAnalysis : undefined, soundPack, anchor.analysis);
   return {
     variants: variants.map((variant) => ({
       ...variant,
@@ -370,6 +405,7 @@ async function parseGeneratedPatch(output: string, fallbackBpm: number, fallback
       soundPack,
       code: variant.code.replace(/setcps\s*\(\s*[^)]+\s*\)/i, `setcps(${anchor.bpm}/60/4)`),
     })),
+    imageAnalysis,
     soundPack,
     voiceTexture: "variants" in generated ? normalizeVoiceTexture(generated.voiceTexture) : undefined,
   };
@@ -411,8 +447,27 @@ function buildStrudelPatchJsonSchema({
   return {
     type: "object",
     additionalProperties: false,
-    required: ["soundPack", "variants", "voiceTexture"],
+    required: ["imageAnalysis", "soundPack", "variants", "voiceTexture"],
     properties: {
+      imageAnalysis: {
+        type: "object",
+        additionalProperties: false,
+        required: ["colors", "texture", "movement", "emotion", "composition", "soundPackRationale", "musicMapping"],
+        properties: {
+          colors: {
+            type: "array",
+            minItems: 2,
+            maxItems: 5,
+            items: { type: "string" },
+          },
+          texture: { type: "string" },
+          movement: { type: "string" },
+          emotion: { type: "string" },
+          composition: { type: "string" },
+          soundPackRationale: { type: "string" },
+          musicMapping: { type: "string" },
+        },
+      },
       soundPack: {
         type: "object",
         additionalProperties: false,
@@ -730,6 +785,7 @@ function buildKananaDraftPrompt({
     "Write a concise creative draft that GPT will compile into strict executable Strudel later.",
     "",
     "Focus on Korean/local language sensitivity, movement, rhythm, image mood, voice texture words, and sound palette.",
+    "Also produce an imageAnalysis draft covering colors, texture, movement, emotion, composition, sound pack rationale, and music mapping.",
     "Choose one sound pack from default-dry, analog-808, club-909, cinematic-808, glitch-909 and explain why it matches the image.",
     "",
     `Prompt: ${prompt}`,
@@ -743,11 +799,12 @@ function buildKananaDraftPrompt({
     "",
     "Return these sections in plain text:",
     "1. Image reading: 3-5 short bullets.",
-    "2. Performance DNA: bpm, style, key/scale, drum backbone, bass motion, density.",
-    "3. Sound pack: chosen id, drum bank, character, and image-based rationale.",
-    "4. Track intentions: BASS, DRUMS, MEL, SYNTH, optional LIGHT/TEXTURE, optional VOICE.",
-    "5. Voice texture words: 5-9 short words or syllables, comma-separated.",
-    "6. Variant directions: one short line per requested variant.",
+    "2. Image analysis debug fields: colors, texture, movement, emotion, composition, music mapping.",
+    "3. Performance DNA: bpm, style, key/scale, drum backbone, bass motion, density.",
+    "4. Sound pack: chosen id, drum bank, character, and image-based rationale.",
+    "5. Track intentions: BASS, DRUMS, MEL, SYNTH, optional LIGHT/TEXTURE, optional VOICE.",
+    "6. Voice texture words: 5-9 short words or syllables, comma-separated.",
+    "7. Variant directions: one short line per requested variant.",
     "",
     "Keep the whole draft under 900 words.",
   ].filter(Boolean).join("\n");
@@ -958,6 +1015,18 @@ function fallbackVariants({ prompt, bpm, style, imageName, variantCount }: { pro
   });
 }
 
+function fallbackImageAnalysis(prompt: string, soundPack: SoundPack, imageName?: string): ImageAnalysis {
+  return normalizeImageAnalysis({
+    colors: ["fallback", "unknown image palette"],
+    texture: "Local fallback could not inspect detailed image texture.",
+    movement: "Uses prompt and file-name cues rather than visual motion analysis.",
+    emotion: "Neutral generated fallback.",
+    composition: imageName ? `Fallback based on uploaded file ${imageName}.` : "Fallback without detailed composition reading.",
+    soundPackRationale: soundPack.rationale,
+    musicMapping: `Prompt cue "${prompt.slice(0, 80)}" mapped to local preset rhythm, timbre and shader defaults.`,
+  }, soundPack);
+}
+
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (Number.isFinite(contentLength) && contentLength > maxRequestBodyBytes) {
@@ -1052,6 +1121,7 @@ export async function POST(request: Request) {
     }
     const variants = generated.variants;
     const primary = variants[0];
+    const imageAnalysis = generated.imageAnalysis;
     const soundPack = generated.soundPack;
     const voiceTexture = mode === "bridge" || !voiceTextureEnabled
       ? undefined
@@ -1063,6 +1133,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json({
       ...primary,
       variants,
+      imageAnalysis,
       soundPack,
       voiceTexture,
       provider: providerUsed,
@@ -1075,11 +1146,13 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error(error);
     const variants = fallbackVariants({ prompt, bpm, style, imageName: body.imageName, variantCount });
+    const soundPack = variants[0]?.soundPack ?? defaultSoundPack;
     const response = NextResponse.json({
       error: "AI failed to generate Strudel code",
       fallback: variants[0],
       variants,
-      soundPack: variants[0]?.soundPack ?? defaultSoundPack,
+      imageAnalysis: fallbackImageAnalysis(prompt, soundPack, body.imageName),
+      soundPack,
     }, { status: 502 });
 
     return freeGptCountToPersist === undefined

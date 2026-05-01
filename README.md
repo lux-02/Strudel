@@ -38,11 +38,13 @@ Strudel AI Visual Coder는 이미지를 입력값으로 삼아 사운드, 코드
 - **라이브 코드 편집**: CodeMirror에서 생성된 Strudel 코드를 바로 수정하고, 재생 중에도 변경 내용을 재평가합니다.
 - **트랙별 비주얼 위젯**: 피아노롤과 waveform scope를 트랙별로 표시하고, 신호가 없는 위젯은 숨깁니다.
 - **오디오 반응형 셰이더**: 드럼, 베이스, 멜로디, 신스, 텍스처 신호가 각각 다른 WebGL 효과에 연결됩니다.
+- **수동 Shader Mode**: Settings에서 `Filament`, `Plasma`, `Spectral`, `Scanline` 중 하나를 선택해 같은 오디오 신호를 다른 시각 언어로 렌더링합니다.
 - **Variant + Evolve**: A/B/C/D 변주를 생성하고, 현재 변주들을 바탕으로 이어지는 새 변주를 만듭니다.
 - **DJ식 큐 전환**: 재생 중 변주를 선택하면 다음 마디 기준으로 큐하고, AI bridge를 통해 긴 크로스페이드를 시도합니다.
 - **Auto Loop**: A/B/C/D 변주를 4/8/16마디 단위로 자동 순환시키고, 각 전환은 기존 큐/bridge/crossfade 흐름을 사용합니다.
 - **AI Visual Style Generator**: 이미지 분석 결과로 `foggy`, `glitch`, `liquid`, `metallic`, `bloom`, `scanline` 값을 생성합니다.
 - **AI Sound Pack Selector**: 이미지의 빛, 질감, 장면성에 따라 `default-dry`, `analog-808`, `club-909`, `cinematic-808`, `glitch-909` 중 하나를 선택하고 Strudel 샘플 bank 사용 여부를 코드에 반영합니다.
+- **Image Analysis Debug Panel**: AI가 이미지를 읽은 색, 질감, 움직임, 감정, soundPack 선택 근거와 음악 매핑 이유를 작은 패널로 표시합니다.
 - **Semantic Vocal Chop 옵션**: 기본 생성에서는 TTS를 끄고, Settings에서 Voice Texture TTS를 켜면 이미지에서 추출한 단어와 형태소를 AI 음성으로 합성해 `$VOICE` 트랙에서 보컬 찹처럼 사용합니다.
 - **GPT / Kanana 선택**: 기본은 OpenAI GPT입니다. Kanana 선택 시 Kanana가 이미지의 로컬/언어적 감각 초안을 만들고, GPT가 이를 실행 가능한 Strudel 코드로 컴파일합니다. GPT 무료 생성 한도를 넘으면 Settings에서 개인 OpenAI API Key를 입력해 계속 사용할 수 있습니다.
 - **무료 생성 한도**: 비로그인 사용자는 브라우저 쿠키 기준 하루 5회까지 서버 GPT 키로 생성할 수 있고, 이후에는 개인 API Key 입력이 필요합니다.
@@ -51,6 +53,8 @@ Strudel AI Visual Coder는 이미지를 입력값으로 삼아 사운드, 코드
 ### 최근 업그레이드
 
 - **체계적인 Sound Pack 선택**: 이미지 분석 결과에 따라 기본 샘플, 808, 909 계열 사운드 팩을 선택하고, 선택된 drum bank가 실제 Strudel 코드에 반영되도록 서버에서 보정합니다.
+- **Shader Mode Material 분리**: `Filament`, `Plasma`, `Spectral`, `Scanline`이 흰색 빛 위의 효과가 아니라 각각 선, 덩어리, 입자, 신호 손상을 주재료로 렌더링되도록 분리했습니다.
+- **Image Analysis Modal**: 작은 debug panel은 말줄임표로 유지하고, 클릭 시 색/질감/움직임/감정/구도/soundPack/음악 매핑 전체 내용을 모달로 확인할 수 있습니다.
 - **Auto Loop 퍼포먼스 모드**: A/B/C/D 변주를 4/8/16마디 단위로 자동 순환시키며, 각 전환은 기존 AI bridge와 4마디 crossfade를 사용합니다.
 - **전환 카운트다운**: Auto Loop 재생 중 다음 변주까지 남은 마디와 시간을 표시해 캡처/라이브 퍼포먼스 흐름을 읽기 쉽게 했습니다.
 - **짧아진 큐 전환**: 큐 대기는 다음 마디 기준으로 정렬하고, bridge/crossfade 기본 길이는 4마디로 조정했습니다.

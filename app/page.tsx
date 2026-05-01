@@ -37,6 +37,7 @@ type GeneratedAIComposition = GeneratedComposition & {
   bpm?: number;
   style?: StyleKey;
   analysis?: string;
+  imageAnalysis?: ImageAnalysis;
   shaderStyle?: ShaderStyle;
   soundPack?: SoundPack;
   provider?: AIProvider;
@@ -90,6 +91,15 @@ type VoiceTexture = {
   mimeType?: string;
   disclosure?: string;
 };
+type ImageAnalysis = {
+  colors?: string[];
+  texture?: string;
+  movement?: string;
+  emotion?: string;
+  composition?: string;
+  soundPackRationale?: string;
+  musicMapping?: string;
+};
 type SoundPack = {
   id?: string;
   name?: string;
@@ -120,6 +130,7 @@ type ShaderStyle = {
   bloom: number;
   scanline: number;
 };
+type ShaderMode = "filament" | "plasma" | "spectral" | "scanline";
 
 export type StrudelWorkspaceDemo = {
   prompt: string;
@@ -152,6 +163,18 @@ const shaderControlLabels: Array<{ key: keyof ShaderStyle; label: string }> = [
   { key: "bloom", label: "Bloom" },
   { key: "scanline", label: "Scanline" },
 ];
+const shaderModeOptions: Array<{ key: ShaderMode; label: string }> = [
+  { key: "filament", label: "Filament" },
+  { key: "plasma", label: "Plasma" },
+  { key: "spectral", label: "Spectral" },
+  { key: "scanline", label: "Scanline" },
+];
+const shaderModeIndex: Record<ShaderMode, number> = {
+  filament: 0,
+  plasma: 1,
+  spectral: 2,
+  scanline: 3,
+};
 
 const initialComposition = generateComposition({
   bpm: 124,
@@ -299,6 +322,21 @@ function normalizeSoundPack(soundPack?: SoundPack): SoundPack | undefined {
   };
 }
 
+function normalizeImageAnalysis(imageAnalysis?: ImageAnalysis, soundPack?: SoundPack, fallbackAnalysis?: string): ImageAnalysis | undefined {
+  if (!imageAnalysis && !soundPack && !fallbackAnalysis) return undefined;
+  const colors = imageAnalysis?.colors?.map((color) => String(color).trim()).filter(Boolean).slice(0, 5);
+
+  return {
+    colors: colors?.length ? colors : undefined,
+    texture: imageAnalysis?.texture,
+    movement: imageAnalysis?.movement,
+    emotion: imageAnalysis?.emotion,
+    composition: imageAnalysis?.composition,
+    soundPackRationale: imageAnalysis?.soundPackRationale ?? soundPack?.rationale,
+    musicMapping: imageAnalysis?.musicMapping ?? fallbackAnalysis,
+  };
+}
+
 function labelForVariant(index: number) {
   return String.fromCharCode(65 + index);
 }
@@ -382,14 +420,29 @@ function createShader(gl: WebGLRenderingContext, type: number, source: string) {
   return shader;
 }
 
-function AudioVisualizer({ isPlaying, shaderStyle, signalRef }: { isPlaying: boolean; shaderStyle: ShaderStyle; signalRef: VisualSignalRef }) {
+function AudioVisualizer({
+  isPlaying,
+  shaderStyle,
+  shaderMode,
+  signalRef,
+}: {
+  isPlaying: boolean;
+  shaderStyle: ShaderStyle;
+  shaderMode: ShaderMode;
+  signalRef: VisualSignalRef;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointerRef = useRef({ x: 0.5, y: 0.5 });
   const shaderStyleRef = useRef(shaderStyle);
+  const shaderModeRef = useRef(shaderMode);
 
   useEffect(() => {
     shaderStyleRef.current = shaderStyle;
   }, [shaderStyle]);
+
+  useEffect(() => {
+    shaderModeRef.current = shaderMode;
+  }, [shaderMode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -431,6 +484,7 @@ function AudioVisualizer({ isPlaying, shaderStyle, signalRef }: { isPlaying: boo
       uniform float u_metallic;
       uniform float u_bloom;
       uniform float u_scanline;
+      uniform float u_shaderMode;
       uniform sampler2D u_feedback;
 
       float hash(vec2 p) {
@@ -580,7 +634,52 @@ function AudioVisualizer({ isPlaying, shaderStyle, signalRef }: { isPlaying: boo
         float fringe = filaments * (0.14 + u_metallic * 0.22) + verticalA * (0.2 + u_glitch * 0.35) + verticalC * u_drums * 0.32 + hot * 0.18 + sliceA * matter * 0.18 + melCurve * u_mel * 0.18;
         vec3 monochrome = vec3(luminance + haze * 0.08);
         vec3 prism = vec3(0.68, 0.88, 1.0) * fringe * (0.08 + u_metallic * 0.2) + vec3(1.0, 0.58, 0.5) * fringe * (0.04 + u_glitch * 0.16);
-        vec3 color = monochrome + bloom * vec3(0.52) + prism;
+        float mode = u_shaderMode;
+        vec3 color = vec3(0.0);
+        float materialMask = 0.0;
+        float modeBloom = 0.0;
+
+        if (mode < 0.5) {
+          float fiber = pow(filaments, 1.42) * (1.24 + u_synth * 0.5);
+          float melodicWire = pow(melCurve + melTrail * 0.65, 1.18) * (0.72 + u_mel * 0.8);
+          float sparks = (verticalA * 0.42 + verticalC * 0.86 + scratches * 0.62) * (0.28 + u_drums * 0.9);
+          float tension = smoothstep(0.02, 0.82, fiber + melodicWire + sparks);
+          materialMask = fiber + melodicWire + sparks;
+          color = vec3(materialMask * 0.92);
+          color += vec3(0.72, 0.86, 1.0) * prism.b * (0.12 + u_metallic * 0.22);
+          color += vec3(tension * 0.08);
+          modeBloom = 0.035 + u_mel * 0.04 + u_drums * 0.025;
+        } else if (mode < 1.5) {
+          float membrane = matter * 0.72 + lowBlob * 1.46 + bassRing * 0.92;
+          float cells = pow(ridges + turbulence * 0.18, 1.7) * smoothstep(0.04, 0.76, membrane);
+          float pressure = smoothstep(0.08, 0.96, membrane + u_bass * 0.28);
+          float surface = membrane * (0.74 + pressure * 0.5) + cells * (0.36 + u_synth * 0.28);
+          materialMask = surface + melCurve * 0.12;
+          color = vec3(surface * 0.74);
+          color += vec3(0.52, 0.58, 0.62) * cells * 0.28;
+          color += vec3(0.85) * bassRing * 0.2;
+          modeBloom = 0.08 + u_bass * 0.11 + u_liquid * 0.04;
+        } else if (mode < 2.5) {
+          float dustField = dust * (0.55 + textureEnergy * 1.08);
+          float ghost = haze * 0.48 + matter * 0.18 + filaments * 0.22 + ridges * (0.18 + u_synth * 0.14);
+          float particles = smoothstep(0.38, 0.98, grain + dustField * 0.62) * (0.08 + textureEnergy * 0.46 + u_light * 0.22);
+          materialMask = ghost + dustField * 0.32 + particles + scratches * 0.12;
+          color = vec3(ghost * 0.62 + particles);
+          color += vec3(0.64, 0.74, 0.86) * dustField * 0.08;
+          color += vec3(scratches * 0.1);
+          modeBloom = 0.025 + textureEnergy * 0.035;
+        } else {
+          float tearing = glitchBand * drumGate + smoothstep(0.82, 1.0, noise(vec2(floor(uv.y * 56.0), floor(t * 32.0)))) * u_glitch;
+          float hardLines = pow(scanline, 5.0) * (0.18 + u_scanline * 0.78 + u_drums * 0.42);
+          float signalBreak = (verticalA * 0.35 + verticalC * 0.58 + scratches * 0.76 + sliceB * matter * 0.28) * (0.42 + u_drums * 0.68);
+          float field = hardLines + signalBreak + tearing * (0.2 + u_glitch * 0.52);
+          materialMask = field;
+          color = vec3(field * 0.72);
+          color += vec3(0.54, 0.68, 0.82) * tearing * u_metallic * 0.1;
+          modeBloom = 0.018 + u_scanline * 0.025 + u_drums * 0.035;
+        }
+        color += bloom * vec3(modeBloom);
+        color += monochrome * 0.035 * smoothstep(0.12, 0.95, materialMask);
 
         vec2 feedbackUv = gl_FragCoord.xy / u_resolution.xy;
         vec2 feedbackCenter = feedbackUv - 0.5;
@@ -677,6 +776,7 @@ function AudioVisualizer({ isPlaying, shaderStyle, signalRef }: { isPlaying: boo
       metallic: gl.getUniformLocation(program, "u_metallic"),
       bloom: gl.getUniformLocation(program, "u_bloom"),
       scanline: gl.getUniformLocation(program, "u_scanline"),
+      shaderMode: gl.getUniformLocation(program, "u_shaderMode"),
       feedback: gl.getUniformLocation(program, "u_feedback"),
     };
     const displayUniforms = {
@@ -756,6 +856,7 @@ function AudioVisualizer({ isPlaying, shaderStyle, signalRef }: { isPlaying: boo
 
       const signal = signalRef.current;
       const style = shaderStyleRef.current;
+      const currentShaderMode = shaderModeRef.current;
       const readTarget = feedbackTargets[readTargetIndex];
       const writeTarget = feedbackTargets[1 - readTargetIndex];
 
@@ -785,6 +886,7 @@ function AudioVisualizer({ isPlaying, shaderStyle, signalRef }: { isPlaying: boo
       gl.uniform1f(uniforms.metallic, style.metallic);
       gl.uniform1f(uniforms.bloom, style.bloom);
       gl.uniform1f(uniforms.scanline, style.scanline);
+      gl.uniform1f(uniforms.shaderMode, shaderModeIndex[currentShaderMode] ?? 0);
       gl.uniform1i(uniforms.feedback, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -955,12 +1057,15 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
   const [runtimeReady, setRuntimeReady] = useState(false);
   const [status, setStatus] = useState("Ready");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const [aiProvider, setAiProvider] = useState<AIProvider>("gpt");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [kananaApiKey, setKananaApiKey] = useState("");
   const [voiceTextureEnabled, setVoiceTextureEnabled] = useState(Boolean(initialDemoVoiceTexture));
   const [shaderStyle, setShaderStyle] = useState<ShaderStyle>(normalizeShaderStyle(initialDemoVariant?.shaderStyle));
+  const [shaderMode, setShaderMode] = useState<ShaderMode>("filament");
   const [soundPack, setSoundPack] = useState<SoundPack | undefined>(normalizeSoundPack(initialDemoVariant?.soundPack));
+  const [imageAnalysis, setImageAnalysis] = useState<ImageAnalysis | undefined>();
   const [variants, setVariants] = useState<GeneratedAIVariant[]>(demoVariants);
   const [activeVariantId, setActiveVariantId] = useState(initialDemoVariant?.id ?? "");
   const [queuedVariantId, setQueuedVariantId] = useState("");
@@ -1217,6 +1322,7 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
     const savedOpenAIKey = window.localStorage.getItem("strudel-openai-api-key");
     const savedKananaKey = window.localStorage.getItem("strudel-kanana-api-key");
     const savedVoiceTextureEnabled = window.localStorage.getItem("strudel-voice-texture-enabled");
+    const savedShaderMode = window.localStorage.getItem("strudel-shader-mode");
 
     if (savedProvider === "gpt" || savedProvider === "kanana") {
       setAiProvider(savedProvider);
@@ -1229,6 +1335,9 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
     }
     if (savedVoiceTextureEnabled === "true") {
       setVoiceTextureEnabled(true);
+    }
+    if (shaderModeOptions.some((option) => option.key === savedShaderMode)) {
+      setShaderMode(savedShaderMode as ShaderMode);
     }
   }, [isReportDemo]);
 
@@ -1259,6 +1368,11 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
     if (isReportDemo) return;
     window.localStorage.setItem("strudel-voice-texture-enabled", String(voiceTextureEnabled));
   }, [isReportDemo, voiceTextureEnabled]);
+
+  useEffect(() => {
+    if (isReportDemo) return;
+    window.localStorage.setItem("strudel-shader-mode", shaderMode);
+  }, [isReportDemo, shaderMode]);
 
   useEffect(() => {
     if (isPlaying && settingsOpen) {
@@ -1716,6 +1830,7 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
         requiresApiKey?: boolean;
       };
       const responseSoundPack = normalizeSoundPack(result.soundPack);
+      const responseImageAnalysis = normalizeImageAnalysis(result.imageAnalysis, responseSoundPack, result.analysis);
       const normalizedVariants = (result.variants ?? [])
         .map((variant, index) => normalizeVariant({ ...variant, soundPack: variant.soundPack ?? responseSoundPack }, index, composition.tracks))
         .filter(Boolean) as GeneratedAIVariant[];
@@ -1731,11 +1846,13 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
       if (!response.ok) {
         if (normalizedVariants.length) {
           setVariants(normalizedVariants);
+          setImageAnalysis(responseImageAnalysis);
           applyVariant(normalizedVariants[0], true);
         } else if (result.fallback) {
           const fallbackVariant = normalizeVariant({ ...result.fallback, soundPack: responseSoundPack }, 0, composition.tracks);
           if (fallbackVariant) {
             setVariants([fallbackVariant]);
+            setImageAnalysis(responseImageAnalysis);
             applyVariant(fallbackVariant, true);
           }
         }
@@ -1750,11 +1867,13 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
 
       if (normalizedVariants.length) {
         setVariants(normalizedVariants);
+        setImageAnalysis(responseImageAnalysis);
         applyVariant(normalizedVariants[0], true);
       } else if (result.code) {
         const singleVariant = normalizeVariant({ ...result, soundPack: result.soundPack ?? responseSoundPack }, 0, composition.tracks);
         if (singleVariant) {
           setVariants([singleVariant]);
+          setImageAnalysis(responseImageAnalysis);
           applyVariant(singleVariant, true);
         } else {
           setStatus("AI returned an empty patch");
@@ -2183,6 +2302,52 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
             </div>
           ) : null}
 
+          {imageAnalysis ? (
+            <button
+              type="button"
+              className="analysis-panel"
+              aria-label="Open image analysis debug panel"
+              onClick={() => setAnalysisOpen(true)}
+            >
+              <div className="analysis-row">
+                <strong>Image Read</strong>
+                {imageAnalysis.colors?.length ? <span>{imageAnalysis.colors.join(" / ")}</span> : null}
+              </div>
+              <dl>
+                {imageAnalysis.texture ? (
+                  <>
+                    <dt>Texture</dt>
+                    <dd title={imageAnalysis.texture}>{imageAnalysis.texture}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.movement ? (
+                  <>
+                    <dt>Motion</dt>
+                    <dd title={imageAnalysis.movement}>{imageAnalysis.movement}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.emotion ? (
+                  <>
+                    <dt>Emotion</dt>
+                    <dd title={imageAnalysis.emotion}>{imageAnalysis.emotion}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.soundPackRationale ? (
+                  <>
+                    <dt>Pack</dt>
+                    <dd title={imageAnalysis.soundPackRationale}>{imageAnalysis.soundPackRationale}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.musicMapping ? (
+                  <>
+                    <dt>Mapping</dt>
+                    <dd title={imageAnalysis.musicMapping}>{imageAnalysis.musicMapping}</dd>
+                  </>
+                ) : null}
+              </dl>
+            </button>
+          ) : null}
+
           <div className="transport-row">
             <button
               onClick={isPlaying ? stop : play}
@@ -2211,6 +2376,67 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
             </p>
           </div>
         </div>
+
+        {analysisOpen && imageAnalysis ? (
+          <div className="analysis-backdrop" role="presentation" onClick={() => setAnalysisOpen(false)}>
+            <section
+              className="analysis-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Image analysis"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="analysis-modal-header">
+                <strong>Image Analysis</strong>
+                <button type="button" onClick={() => setAnalysisOpen(false)}>Close</button>
+              </div>
+              <dl>
+                {imageAnalysis.colors?.length ? (
+                  <>
+                    <dt>Colors</dt>
+                    <dd>{imageAnalysis.colors.join(" / ")}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.texture ? (
+                  <>
+                    <dt>Texture</dt>
+                    <dd>{imageAnalysis.texture}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.movement ? (
+                  <>
+                    <dt>Motion</dt>
+                    <dd>{imageAnalysis.movement}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.emotion ? (
+                  <>
+                    <dt>Emotion</dt>
+                    <dd>{imageAnalysis.emotion}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.composition ? (
+                  <>
+                    <dt>Composition</dt>
+                    <dd>{imageAnalysis.composition}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.soundPackRationale ? (
+                  <>
+                    <dt>Sound Pack</dt>
+                    <dd>{imageAnalysis.soundPackRationale}</dd>
+                  </>
+                ) : null}
+                {imageAnalysis.musicMapping ? (
+                  <>
+                    <dt>Mapping</dt>
+                    <dd>{imageAnalysis.musicMapping}</dd>
+                  </>
+                ) : null}
+              </dl>
+            </section>
+          </div>
+        ) : null}
 
         {settingsOpen ? (
           <div className="settings-backdrop" role="presentation" onClick={() => setSettingsOpen(false)}>
@@ -2286,6 +2512,18 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
                   <strong>AI Visual Style</strong>
                   <button type="button" onClick={() => setShaderStyle(defaultShaderStyle)}>Reset</button>
                 </div>
+                <div className="shader-mode-options" role="radiogroup" aria-label="Shader mode">
+                  {shaderModeOptions.map((option) => (
+                    <button
+                      type="button"
+                      className={shaderMode === option.key ? "selected" : ""}
+                      key={option.key}
+                      onClick={() => setShaderMode(option.key)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="shader-controls">
                   {shaderControlLabels.map((control) => (
                     <label className="shader-control" key={control.key}>
@@ -2319,7 +2557,7 @@ export function StrudelWorkspace({ demo }: { demo?: StrudelWorkspaceDemo }) {
         <div className="main-panel">
           <section className="editor-panel" aria-label="Strudel code editor">
             <div className="editor-shader-backdrop" aria-hidden="true">
-              <AudioVisualizer isPlaying={isPlaying} shaderStyle={shaderStyle} signalRef={visualSignalRef} />
+              <AudioVisualizer isPlaying={isPlaying} shaderStyle={shaderStyle} shaderMode={shaderMode} signalRef={visualSignalRef} />
             </div>
 
             <CodeMirror
